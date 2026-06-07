@@ -1,0 +1,7 @@
+{
+  "name": "ibiki-sound",
+  "version": "1.0.0",
+  "description": "On-device sleep-sound classification (Apple SoundAnalysis) for いびき",
+  "main": "index.ts",
+  "private": true
+}
