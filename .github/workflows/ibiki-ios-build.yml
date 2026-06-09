@@ -142,6 +142,23 @@ jobs:
       - name: Install JS dependencies
         run: npm ci
 
+      - name: Write build-time env (RevenueCat public SDK key)
+        env:
+          EXPO_PUBLIC_RC_API_KEY_IOS: ${{ vars.EXPO_PUBLIC_RC_API_KEY_IOS }}
+        run: |
+          set -euo pipefail
+          # EXPO_PUBLIC_* are inlined by Metro from .env files; an env var on the
+          # archive step alone isn't reliably seen by the Xcode bundle phase. Write
+          # .env.local so the RC key is baked in, and fail closed if it's empty
+          # (no dead paywall / mock build ever ships). Canonical: apps/_shared/iap/.
+          if [ -n "${EXPO_PUBLIC_RC_API_KEY_IOS:-}" ]; then
+            echo "EXPO_PUBLIC_RC_API_KEY_IOS=${EXPO_PUBLIC_RC_API_KEY_IOS}" >> .env.local
+            echo "Wrote EXPO_PUBLIC_RC_API_KEY_IOS to .env.local"
+          else
+            echo "::error::EXPO_PUBLIC_RC_API_KEY_IOS is empty — refusing to ship a dead paywall / mock build"
+            exit 1
+          fi
+
       - name: Expo prebuild (iOS)
         run: npx expo prebuild --platform ios --no-install
 
