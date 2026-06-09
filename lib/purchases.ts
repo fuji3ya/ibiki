@@ -31,6 +31,15 @@ export async function initPurchases(userId?: string): Promise<void> {
   }
   Purchases.setLogLevel(__DEV__ ? LOG_LEVEL.DEBUG : LOG_LEVEL.INFO);
   await Purchases.configure({ apiKey: key, appUserID: userId });
+  // Catch out-of-band grants (Ask-to-Buy parental approval, deferred SCA,
+  // network-drop reconcile): upgrade-only refresh of the local cache.
+  try {
+    Purchases.addCustomerInfoUpdateListener((info) => {
+      if (info.entitlements.active[ENTITLEMENT_ID]?.isActive) {
+        AsyncStorage.setItem(StorageKeys.ENTITLEMENT_ACTIVE, '1').catch(() => {});
+      }
+    });
+  } catch { /* listener is best-effort */ }
   initialized = true;
 }
 
@@ -65,6 +74,9 @@ export async function getPlanPrices(): Promise<{ annual: string; weekly: string 
 export async function purchasePlan(planId: 'annual' | 'weekly'): Promise<boolean> {
   // Mock path — RC 未設定時は UX テストのため成功扱い
   if (!RC_API_KEY_IOS) {
+    // Mock may only grant in development — a keyless Release build must never
+    // hand out free pro (CI also asserts the key, this is defense-in-depth).
+    if (!__DEV__) return false;
     await AsyncStorage.setItem(StorageKeys.ENTITLEMENT_ACTIVE, '1');
     return true;
   }
@@ -87,7 +99,7 @@ export async function purchasePlan(planId: 'annual' | 'weekly'): Promise<boolean
 
 export async function isPro(): Promise<boolean> {
   if (!RC_API_KEY_IOS) {
-    return (await AsyncStorage.getItem(StorageKeys.ENTITLEMENT_ACTIVE)) === '1';
+    return __DEV__ && (await AsyncStorage.getItem(StorageKeys.ENTITLEMENT_ACTIVE)) === '1';
   }
   try {
     const info = await Purchases.getCustomerInfo();
@@ -98,7 +110,7 @@ export async function isPro(): Promise<boolean> {
 }
 
 export async function restorePurchases(): Promise<boolean> {
-  if (!RC_API_KEY_IOS) return isPro();
+  if (!RC_API_KEY_IOS) return __DEV__ ? isPro() : false;
   try {
     const info = await Purchases.restorePurchases();
     return info.entitlements.active[ENTITLEMENT_ID]?.isActive ?? false;
