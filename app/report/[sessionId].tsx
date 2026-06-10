@@ -5,7 +5,9 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { SymbolView } from 'expo-symbols';
-import { getSession, getEvents, getHighlights } from '../../lib/db';
+import { getSession, getEvents, getHighlights, countSessions } from '../../lib/db';
+import { isPro } from '../../lib/purchases';
+import { shouldShowHardPaywall } from '../../lib/paywall-gate';
 import { computeNightlyScore, scoreBandLabel } from '../../lib/scoring';
 import { formatDurationJa, formatClock } from '../../lib/format';
 import { theme } from '../../lib/theme';
@@ -36,6 +38,13 @@ export default function ReportScreen() {
   useEffect(() => {
     (async () => {
       if (!sessionId) return;
+      // ハードペイウォール（2夜目以降・非Pro）。録音フロー/履歴ドリル/deep link の
+      // どの入口から来てもここで一点強制（plan §5 / Mirrorbite deep-link bypass 教訓）。
+      const [pro, sessionCount] = await Promise.all([isPro(), countSessions()]);
+      if (shouldShowHardPaywall({ isPro: pro, sessionCount })) {
+        router.replace({ pathname: '/paywall', params: { sessionId } });
+        return;
+      }
       const [s, ev, hl] = await Promise.all([
         getSession(sessionId),
         getEvents(sessionId),
@@ -46,7 +55,7 @@ export default function ReportScreen() {
       setHighlights(hl);
       setLoaded(true);
     })();
-  }, [sessionId]);
+  }, [sessionId, router]);
 
   if (!loaded) {
     return (

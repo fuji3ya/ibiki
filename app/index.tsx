@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -12,7 +12,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SymbolView } from 'expo-symbols';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAudioRecorder, useAudioRecorderState } from 'expo-audio';
+import { StorageKeys } from '../lib/storage-keys';
 import {
   SLEEP_RECORDING_OPTIONS,
   configureSleepAudioMode,
@@ -33,7 +35,20 @@ export default function RecordScreen() {
   const recorder = useAudioRecorder(SLEEP_RECORDING_OPTIONS);
   const state = useAudioRecorderState(recorder, 500);
   const [phase, setPhase] = useState<Phase>('idle');
+  const [onboarded, setOnboarded] = useState<boolean | null>(null);
   const startedAt = useRef<number>(0);
+
+  // 初回起動はオンボへ（O1-O4）。チェックが済むまで描画しない（フラッシュ防止）。
+  useEffect(() => {
+    (async () => {
+      const done = (await AsyncStorage.getItem(StorageKeys.ONBOARDING_DONE)) === '1';
+      if (!done) {
+        router.replace('/onboarding');
+        return;
+      }
+      setOnboarded(true);
+    })();
+  }, [router]);
 
   const onSleep = async () => {
     try {
@@ -81,6 +96,10 @@ export default function RecordScreen() {
 
   const elapsedSec = Math.floor(state.durationMillis / 1000);
   const meter = state.metering != null ? dbToMeter(state.metering) : 0;
+
+  if (onboarded === null) {
+    return <View style={styles.root} />;
+  }
 
   return (
     <View style={styles.root}>

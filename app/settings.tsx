@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import Constants from 'expo-constants';
 import { AudioModule } from 'expo-audio';
@@ -15,6 +15,7 @@ const PRIVACY_URL = 'https://ibiki.starving-effort.com/privacy';
 const TERMS_URL = 'https://ibiki.starving-effort.com/terms';
 
 export default function SettingsScreen() {
+  const router = useRouter();
   const { width, height } = useWindowDimensions();
   const [pro, setPro] = useState(false);
   const [micGranted, setMicGranted] = useState<boolean | null>(null);
@@ -60,6 +61,10 @@ export default function SettingsScreen() {
 
         <View style={styles.card}>
           <Row label="プラン" value={pro ? 'Pro' : '無料'} />
+          <Divider />
+          <Pressable onPress={() => router.push(pro ? '/guide' : '/paywall')}>
+            <Text style={styles.action}>いびき対策ガイド{pro ? '' : '（Pro）'}</Text>
+          </Pressable>
           <Divider />
           <Pressable onPress={onRestore}><Text style={styles.action}>購入を復元する</Text></Pressable>
         </View>
