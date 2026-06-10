@@ -86,16 +86,19 @@ export default function OnboardingScreen() {
         </View>
 
         <View style={styles.visual}>
-          <View style={[styles.halo, styles.halo1]} />
-          <View style={[styles.halo, styles.halo2]} />
-          <LinearGradient
-            colors={['#243056', '#141C34']}
-            start={{ x: 0.3, y: 0.2 }}
-            end={{ x: 0.8, y: 1 }}
-            style={styles.glyph}
-          >
-            <SymbolView name={s.icon} size={54} tintColor="#BFD2FF" fallback={<Text style={{ fontSize: 40 }}>●</Text>} />
-          </LinearGradient>
+          {/* 固定サイズスタックで重ねて centering を構造的に保証（実機 Fabric 対策） */}
+          <View style={styles.visualStack}>
+            <View style={[styles.halo, styles.halo1]} />
+            <View style={[styles.halo, styles.halo2]} />
+            <LinearGradient
+              colors={['#243056', '#141C34']}
+              start={{ x: 0.3, y: 0.2 }}
+              end={{ x: 0.8, y: 1 }}
+              style={styles.glyph}
+            >
+              <SymbolView name={s.icon} size={54} tintColor="#BFD2FF" fallback={<Text style={{ fontSize: 40 }}>●</Text>} />
+            </LinearGradient>
+          </View>
         </View>
 
         <Text style={styles.title}>{s.title}</Text>
@@ -128,9 +131,10 @@ const styles = StyleSheet.create({
   skipRow: { alignItems: 'flex-end', paddingTop: 6, height: 28 },
   skip: { color: theme.textFaint, fontSize: 13 },
   visual: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  visualStack: { width: 280, height: 280, alignSelf: 'center', alignItems: 'center', justifyContent: 'center' },
   halo: { position: 'absolute', borderRadius: 999 },
-  halo1: { width: 280, height: 280, backgroundColor: 'rgba(139,180,255,0.10)' },
-  halo2: { width: 210, height: 210, backgroundColor: 'rgba(182,156,255,0.12)' },
+  halo1: { top: 0, left: 0, width: 280, height: 280, backgroundColor: 'rgba(139,180,255,0.10)' },
+  halo2: { top: 35, left: 35, width: 210, height: 210, backgroundColor: 'rgba(182,156,255,0.12)' },
   glyph: {
     width: 148,
     height: 148,

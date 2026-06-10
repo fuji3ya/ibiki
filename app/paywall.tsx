@@ -93,9 +93,9 @@ export default function PaywallScreen() {
           >
             <SymbolView name="moon.stars.fill" size={30} tintColor="#BFD2FF" fallback={<Text>●</Text>} />
           </LinearGradient>
-          <Text style={styles.h1}>2夜目からは いびき Pro で</Text>
+          <Text style={styles.h1}>ここからは いびき Pro で</Text>
           <Text style={styles.lead}>
-            ゆうべの記録はもう端末の中に。{'\n'}Pro にすると毎朝のレポートがずっと見られます。
+            無料で見られる3夜分の記録は端末の中に。{'\n'}Pro にすると毎朝のレポートがずっと見られます。
           </Text>
 
           <GlassCard style={styles.benefits} radius={18}>

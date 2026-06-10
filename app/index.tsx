@@ -25,6 +25,7 @@ import { processRecording } from '../lib/session-pipeline';
 import { formatElapsed, dbToMeter } from '../lib/format';
 import { theme } from '../lib/theme';
 import { NightBackground } from '../components/NightBackground';
+import { GlassCard } from '../components/GlassCard';
 import { BottomNav } from '../components/BottomNav';
 
 type Phase = 'idle' | 'recording' | 'processing';
@@ -112,29 +113,36 @@ export default function RecordScreen() {
               <Text style={styles.brand}>いびき</Text>
             </View>
 
-            {/* signature: 夜空に浮かぶガラスの就寝ボタン（v2） */}
+            {/* signature: 夜空に浮かぶガラスの就寝ボタン（v2）。
+                centering は固定サイズの orbStack に絶対座標で重ねて構造的に保証
+                （実機 Fabric で flex の absolute 配置が左端に寄るバグの恒久対策）。 */}
             <View style={styles.orbWrap}>
-              <View style={styles.outerRing} />
-              <Pressable onPress={onSleep} style={({ pressed }) => pressed && styles.pressed}>
-                <View style={styles.glassBtn}>
-                  <LinearGradient
-                    colors={['rgba(176,196,255,0.16)', 'rgba(120,140,210,0.05)', 'rgba(20,28,60,0.20)']}
-                    start={{ x: 0.3, y: 0.1 }}
-                    end={{ x: 0.7, y: 1 }}
-                    style={StyleSheet.absoluteFill}
-                  />
-                  {/* 上端の反射ハイライト */}
-                  <LinearGradient
-                    colors={['rgba(255,255,255,0.13)', 'transparent']}
-                    start={{ x: 0.5, y: 0 }}
-                    end={{ x: 0.5, y: 1 }}
-                    style={styles.glassShine}
-                  />
-                  <SymbolView name="moon.stars.fill" size={34} tintColor="#CDDCFF" fallback={<Text style={{ fontSize: 28 }}>●</Text>} />
-                  <Text style={styles.orbLabel}>おやすみ</Text>
-                  <Text style={styles.orbSub}>録音をはじめる</Text>
-                </View>
-              </Pressable>
+              <View style={styles.orbStack}>
+                <View style={styles.outerRing} pointerEvents="none" />
+                <Pressable
+                  onPress={onSleep}
+                  style={({ pressed }) => [styles.orbPress, pressed && styles.pressed]}
+                >
+                  <View style={styles.glassBtn}>
+                    <LinearGradient
+                      colors={['rgba(176,196,255,0.16)', 'rgba(120,140,210,0.05)', 'rgba(20,28,60,0.20)']}
+                      start={{ x: 0.3, y: 0.1 }}
+                      end={{ x: 0.7, y: 1 }}
+                      style={StyleSheet.absoluteFill}
+                    />
+                    {/* 上端の反射ハイライト */}
+                    <LinearGradient
+                      colors={['rgba(255,255,255,0.13)', 'transparent']}
+                      start={{ x: 0.5, y: 0 }}
+                      end={{ x: 0.5, y: 1 }}
+                      style={styles.glassShine}
+                    />
+                    <SymbolView name="moon.stars.fill" size={34} tintColor="#CDDCFF" fallback={<Text style={{ fontSize: 28 }}>●</Text>} />
+                    <Text style={styles.orbLabel}>おやすみ</Text>
+                    <Text style={styles.orbSub}>録音をはじめる</Text>
+                  </View>
+                </Pressable>
+              </View>
             </View>
 
             <Text style={styles.tagline}>
@@ -150,14 +158,24 @@ export default function RecordScreen() {
 
         {phase === 'recording' && (
           <View style={styles.center}>
-            <Text style={styles.recLabel}>録音中</Text>
-            <Text style={styles.timer}>{formatElapsed(elapsedSec)}</Text>
-            <View style={styles.meterTrack}>
-              <View style={[styles.meterFill, { width: `${Math.round(meter * 100)}%` }]} />
+            <View style={styles.recBadge}>
+              <View style={styles.recDot} />
+              <Text style={styles.recLabel}>録音中</Text>
             </View>
-            <Text style={styles.meterHint}>いまの音の大きさ</Text>
+            <Text style={styles.timer}>{formatElapsed(elapsedSec)}</Text>
+            <GlassCard style={styles.meterCard} radius={18}>
+              <Text style={styles.meterHint}>いまの音の大きさ</Text>
+              <View style={styles.meterTrack}>
+                <LinearGradient
+                  colors={['#8FB5FF', '#B49CFF']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={[styles.meterFill, { width: `${Math.max(2, Math.round(meter * 100))}%` }]}
+                />
+              </View>
+            </GlassCard>
             <Pressable onPress={onWake} style={({ pressed }) => pressed && styles.pressed}>
-              <LinearGradient colors={['#7C8CF0', '#5C6CD0']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.wakeBtn}>
+              <LinearGradient colors={['#8A97F2', '#6573DC', '#5560C8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.wakeBtn}>
                 <Text style={styles.wakeBtnText}>おはよう</Text>
                 <Text style={styles.wakeBtnSub}>録音をとめてレポートを見る</Text>
               </LinearGradient>
@@ -186,14 +204,19 @@ const styles = StyleSheet.create({
   brand: { color: '#EDF2FF', fontSize: 34, fontWeight: '200', letterSpacing: 14, marginTop: 6, paddingLeft: 14 },
 
   orbWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  // 固定サイズのスタック: ring と button を絶対座標で重ね、親 flex の挙動差に依存しない
+  orbStack: { width: 218, height: 218, alignSelf: 'center' },
   outerRing: {
     position: 'absolute',
+    top: 0,
+    left: 0,
     width: 218,
     height: 218,
     borderRadius: 109,
     borderWidth: 1,
     borderColor: 'rgba(176,196,255,0.12)',
   },
+  orbPress: { position: 'absolute', top: 14, left: 14 },
   glassBtn: {
     width: 190,
     height: 190,
@@ -225,12 +248,26 @@ const styles = StyleSheet.create({
   privacy: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 12 },
   privacyT: { color: theme.textFaint, fontSize: 11, letterSpacing: 0.3 },
 
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 28 },
-  recLabel: { color: theme.accent, fontSize: 14, fontWeight: '700', letterSpacing: 2 },
-  timer: { color: theme.text, fontSize: 52, fontWeight: '200', fontVariant: ['tabular-nums'] },
-  meterTrack: { width: 220, height: 8, borderRadius: 4, backgroundColor: theme.bgElevated, overflow: 'hidden', marginTop: 8 },
-  meterFill: { height: '100%', backgroundColor: theme.accent, borderRadius: 4 },
-  meterHint: { color: theme.textFaint, fontSize: 12 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 18, padding: 28 },
+  recBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: 'rgba(150,170,225,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(148,168,220,0.16)',
+  },
+  recDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#FF8BA0',
+    shadowColor: '#FF8BA0', shadowOpacity: 0.8, shadowRadius: 6, shadowOffset: { width: 0, height: 0 } },
+  recLabel: { color: theme.text, fontSize: 12.5, fontWeight: '700', letterSpacing: 3 },
+  timer: { color: theme.text, fontSize: 64, fontWeight: '200', letterSpacing: -1, fontVariant: ['tabular-nums'] },
+  meterCard: { width: 260, paddingHorizontal: 18, paddingVertical: 14, gap: 10, alignItems: 'center' },
+  meterTrack: { width: '100%', height: 7, borderRadius: 4, backgroundColor: 'rgba(20,27,58,0.9)', overflow: 'hidden' },
+  meterFill: { height: '100%', borderRadius: 4 },
+  meterHint: { color: theme.textFaint, fontSize: 10.5, letterSpacing: 1.5, fontWeight: '600' },
   wakeBtn: { marginTop: 36, paddingHorizontal: 44, paddingVertical: 18, borderRadius: 18, alignItems: 'center', gap: 2 },
   wakeBtnText: { color: '#fff', fontSize: 20, fontWeight: '800' },
   wakeBtnSub: { color: '#fff', fontSize: 12, opacity: 0.85 },

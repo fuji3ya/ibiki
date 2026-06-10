@@ -8,14 +8,16 @@ describe('shouldShowHardPaywall', () => {
     expect(shouldShowHardPaywall({ isPro: true, sessionCount: 100 })).toBe(false);
   });
 
-  it('first night is the free taste — report stays open', () => {
+  it('first 3 nights are the free taste — report stays open', () => {
     expect(shouldShowHardPaywall({ isPro: false, sessionCount: 0 })).toBe(false);
     expect(shouldShowHardPaywall({ isPro: false, sessionCount: 1 })).toBe(false);
+    expect(shouldShowHardPaywall({ isPro: false, sessionCount: 2 })).toBe(false);
+    expect(shouldShowHardPaywall({ isPro: false, sessionCount: 3 })).toBe(false);
   });
 
-  it('fires from the 2nd recorded night onward for free users', () => {
-    expect(shouldShowHardPaywall({ isPro: false, sessionCount: 2 })).toBe(true);
-    expect(shouldShowHardPaywall({ isPro: false, sessionCount: 5 })).toBe(true);
+  it('fires from the 4th recorded night onward for free users', () => {
+    expect(shouldShowHardPaywall({ isPro: false, sessionCount: 4 })).toBe(true);
+    expect(shouldShowHardPaywall({ isPro: false, sessionCount: 7 })).toBe(true);
   });
 
   it('FREE_NIGHTS constant matches the boundary', () => {
