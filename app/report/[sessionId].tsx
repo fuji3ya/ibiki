@@ -32,9 +32,30 @@ export default function ReportScreen() {
   const [events, setEvents] = useState<ClassificationEvent[]>([]);
   const [highlights, setHighlights] = useState<HighlightClip[]>([]);
   const [loaded, setLoaded] = useState(false);
+  // 再生中のクリップ id（トグル停止 + 再生中の見た目に使う）
+  const [playingClipId, setPlayingClipId] = useState<string | null>(null);
 
   const player = useAudioPlayer(session?.audioFileUri ?? null);
   const status = useAudioPlayerStatus(player);
+
+  // ハイライトは「クリップ開始から CLIP_WINDOW_SEC」だけ再生して自動停止する
+  // （止める手段が無い/夜通し流れ続ける、の実機フィードバック対応）。
+  const CLIP_WINDOW_SEC = 15;
+  const playingClip = highlights.find((h) => h.id === playingClipId) ?? null;
+  useEffect(() => {
+    if (!playingClip) return;
+    if (!status.playing) return;
+    if (status.currentTime >= playingClip.startSec + CLIP_WINDOW_SEC) {
+      player.pause();
+      setPlayingClipId(null);
+    }
+  }, [status.currentTime, status.playing, playingClip, player]);
+  // 端まで再生し切った場合もリセット
+  useEffect(() => {
+    if (!status.playing && playingClipId && status.didJustFinish) {
+      setPlayingClipId(null);
+    }
+  }, [status.playing, status.didJustFinish, playingClipId]);
 
   useEffect(() => {
     (async () => {
@@ -86,8 +107,15 @@ export default function ReportScreen() {
 
   const playClip = async (clip: HighlightClip) => {
     if (!session.audioFileUri) return;
+    // 同じクリップをもう一度タップ → 停止（トグル）
+    if (playingClipId === clip.id && status.playing) {
+      player.pause();
+      setPlayingClipId(null);
+      return;
+    }
     await player.seekTo(clip.startSec);
     player.play();
+    setPlayingClipId(clip.id);
   };
 
   const onShare = async () => {
@@ -95,7 +123,7 @@ export default function ReportScreen() {
     await Share.share({
       message:
         `🌙 ゆうべの睡眠サウンドレポート\n` +
-        `夜間スコア ${session.nightlyScore}／100\n` +
+        `夜の静かさスコア ${session.nightlyScore}／100\n` +
         `いびき 約${mins}分・最大音量 ${peakLabel}\n` +
         `#いびき`,
     });
@@ -114,7 +142,9 @@ export default function ReportScreen() {
         </View>
 
         <View style={styles.ringWrap}>
+          <Text style={styles.scoreKind}>夜の静かさスコア</Text>
           <ScoreRing score={session.nightlyScore} label={scoreBandLabel(session.nightlyScore)} />
+          <Text style={styles.scoreKindNote}>いびきの時間と音量から算出（高いほど静かな夜）</Text>
         </View>
 
         {/* スコアの根拠（WHY）— 健康系の信頼づくり。医療表現なし。 */}
@@ -142,17 +172,16 @@ export default function ReportScreen() {
           <Text style={styles.dim}>目立つ音は記録されませんでした。静かな夜だったみたい。</Text>
         ) : (
           highlights.map((clip) => {
-            const playingThis =
-              status.playing && Math.abs(status.currentTime - clip.startSec) < 12;
+            const playingThis = playingClipId === clip.id && status.playing;
             return (
               <Pressable key={clip.id} style={({ pressed }) => pressed && styles.pressed} onPress={() => playClip(clip)}>
                 <GlassCard style={styles.clip}>
-                  <View style={styles.playCircle}>
+                  <View style={[styles.playCircle, playingThis && styles.playCircleActive]}>
                     <SymbolView
-                      name={playingThis ? 'waveform' : 'play.fill'}
+                      name={playingThis ? 'stop.fill' : 'play.fill'}
                       size={15}
                       tintColor="#D6E2FF"
-                      fallback={<Text style={{ color: theme.accent, fontSize: 14 }}>▶</Text>}
+                      fallback={<Text style={{ color: theme.accent, fontSize: 14 }}>{playingThis ? '■' : '▶'}</Text>}
                     />
                   </View>
                   <View style={{ flex: 1 }}>
@@ -206,7 +235,9 @@ const styles = StyleSheet.create({
   header: { gap: 5, marginTop: 4 },
   date: { color: theme.textFaint, fontSize: 10.5, fontWeight: '700', letterSpacing: 2.5 },
   title: { color: theme.text, fontSize: 26, fontWeight: '700', letterSpacing: -0.3 },
-  ringWrap: { alignItems: 'center', marginVertical: 2 },
+  ringWrap: { alignItems: 'center', marginVertical: 2, gap: 2 },
+  scoreKind: { color: theme.textDim, fontSize: 11.5, fontWeight: '700', letterSpacing: 2.5 },
+  scoreKindNote: { color: theme.textFaint, fontSize: 10.5, letterSpacing: 0.3 },
   reasonCard: { padding: 15 },
   reasonText: { color: '#DDE6F8', fontSize: 13.5, lineHeight: 23 },
   statsRow: { flexDirection: 'row', gap: 10 },
@@ -239,6 +270,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 9,
     shadowOffset: { width: 0, height: 0 },
+  },
+  playCircleActive: {
+    backgroundColor: 'rgba(124,140,240,0.45)',
+    borderColor: 'rgba(176,196,255,0.7)',
+    shadowOpacity: 0.6,
   },
   clipLabel: { color: theme.text, fontSize: 14, fontWeight: '700' },
   clipMeta: { color: theme.textFaint, fontSize: 11, marginTop: 2, letterSpacing: 0.3 },
