@@ -7,6 +7,7 @@ import { isPro } from '../lib/purchases';
 import { GUIDE_TIPS, GUIDE_FOOTER } from '../lib/guide-content';
 import { theme } from '../lib/theme';
 import { NightBackground } from '../components/NightBackground';
+import { GlassCard } from '../components/GlassCard';
 
 // いびき対策ガイド（Pro 特典）。ゲートは本画面で強制（deep link でも素通りさせない）。
 export default function GuideScreen() {
@@ -50,7 +51,7 @@ export default function GuideScreen() {
           <Text style={styles.lead}>今夜からできる7つの工夫。レポートとくらべながら、合うものを見つけてね。</Text>
 
           {GUIDE_TIPS.map((tip, i) => (
-            <View key={tip.id} style={styles.card}>
+            <GlassCard key={tip.id} style={styles.card} radius={16}>
               <View style={styles.cardHead}>
                 <View style={styles.cardIc}>
                   <SymbolView name={tip.icon as SymbolViewProps['name']} size={18} tintColor={theme.accent} fallback={<Text>·</Text>} />
@@ -63,7 +64,7 @@ export default function GuideScreen() {
                 <SymbolView name="arrow.right.circle.fill" size={14} tintColor={theme.good} fallback={<Text>→</Text>} />
                 <Text style={styles.cardAction}>{tip.action}</Text>
               </View>
-            </View>
+            </GlassCard>
           ))}
 
           <Text style={styles.footer}>{GUIDE_FOOTER}</Text>
@@ -81,14 +82,7 @@ const styles = StyleSheet.create({
   back: { width: 40, height: 40, alignItems: 'flex-start', justifyContent: 'center' },
   title: { color: theme.text, fontSize: 26, fontWeight: '800', letterSpacing: -0.3 },
   lead: { color: theme.textDim, fontSize: 13.5, lineHeight: 22, marginTop: 6, marginBottom: 16 },
-  card: {
-    backgroundColor: theme.bgElevated,
-    borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.border,
-    padding: 16,
-    marginBottom: 10,
-  },
+  card: { padding: 16, marginBottom: 10 },
   cardHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   cardIc: {
     width: 32,

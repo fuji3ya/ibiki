@@ -8,6 +8,7 @@ import { AudioModule } from 'expo-audio';
 import { isPro, restorePurchases } from '../lib/purchases';
 import { theme } from '../lib/theme';
 import { NightBackground } from '../components/NightBackground';
+import { GlassCard } from '../components/GlassCard';
 import { BottomNav } from '../components/BottomNav';
 
 // legal サイトは Phase 5 で ibiki.starving-effort.com にデプロイ予定。
@@ -59,7 +60,7 @@ export default function SettingsScreen() {
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.title}>設定</Text>
 
-        <View style={styles.card}>
+        <GlassCard style={styles.card}>
           <Row label="プラン" value={pro ? 'Pro' : '無料'} />
           <Divider />
           <Pressable onPress={() => router.push(pro ? '/guide' : '/paywall')}>
@@ -67,9 +68,9 @@ export default function SettingsScreen() {
           </Pressable>
           <Divider />
           <Pressable onPress={onRestore}><Text style={styles.action}>購入を復元する</Text></Pressable>
-        </View>
+        </GlassCard>
 
-        <View style={styles.card}>
+        <GlassCard style={styles.card}>
           <Row
             label="マイクの許可"
             value={micGranted == null ? '—' : micGranted ? '許可済み' : '未許可'}
@@ -81,9 +82,9 @@ export default function SettingsScreen() {
               <Pressable onPress={onRequestMic}><Text style={styles.action}>マイクを許可する</Text></Pressable>
             </>
           )}
-        </View>
+        </GlassCard>
 
-        <View style={styles.card}>
+        <GlassCard style={styles.card}>
           <Pressable onPress={() => WebBrowser.openBrowserAsync(PRIVACY_URL)}>
             <Text style={styles.action}>プライバシーポリシー</Text>
           </Pressable>
@@ -91,7 +92,7 @@ export default function SettingsScreen() {
           <Pressable onPress={() => WebBrowser.openBrowserAsync(TERMS_URL)}>
             <Text style={styles.action}>利用規約</Text>
           </Pressable>
-        </View>
+        </GlassCard>
 
         <Text style={styles.version}>いびき v{Constants.expoConfig?.version ?? '1.0.0'}</Text>
         <Text style={styles.privacyNote}>
@@ -122,21 +123,14 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   scroll: { padding: 22, gap: 16, paddingBottom: 32 },
   title: { color: theme.text, fontSize: 26, fontWeight: '800', marginTop: 6 },
-  card: {
-    backgroundColor: theme.bgElevated,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.border,
-  },
+  card: { paddingHorizontal: 16, paddingVertical: 4 },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14 },
   rowLabel: { color: theme.text, fontSize: 15, fontWeight: '600' },
   rowValue: { color: theme.textDim, fontSize: 15, fontWeight: '700' },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14 },
   hint: { color: theme.textFaint, fontSize: 12, marginTop: 4, lineHeight: 18 },
   action: { color: theme.accent, fontSize: 15, fontWeight: '700', paddingVertical: 14 },
-  divider: { height: StyleSheet.hairlineWidth, backgroundColor: theme.border },
+  divider: { height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(176,196,255,0.10)' },
   version: { color: theme.textFaint, fontSize: 12, textAlign: 'center', marginTop: 8 },
   privacyNote: { color: theme.textFaint, fontSize: 12, textAlign: 'center', lineHeight: 18 },
 });

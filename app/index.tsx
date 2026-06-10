@@ -103,7 +103,7 @@ export default function RecordScreen() {
 
   return (
     <View style={styles.root}>
-      <NightBackground width={width} height={height} />
+      <NightBackground width={width} height={height} variant="landscape" />
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
         {phase === 'idle' && (
           <View style={styles.idle}>
@@ -112,23 +112,28 @@ export default function RecordScreen() {
               <Text style={styles.brand}>いびき</Text>
             </View>
 
-            {/* signature: 夜に呼吸するオーブ */}
+            {/* signature: 夜空に浮かぶガラスの就寝ボタン（v2） */}
             <View style={styles.orbWrap}>
-              <View style={[styles.halo, styles.halo1]} />
-              <View style={[styles.halo, styles.halo2]} />
-              <View style={styles.ring1} />
-              <View style={styles.ring2} />
+              <View style={styles.outerRing} />
               <Pressable onPress={onSleep} style={({ pressed }) => pressed && styles.pressed}>
-                <LinearGradient
-                  colors={['#243056', '#141C34']}
-                  start={{ x: 0.3, y: 0.2 }}
-                  end={{ x: 0.8, y: 1 }}
-                  style={styles.orbBtn}
-                >
-                  <SymbolView name="moon.stars.fill" size={38} tintColor="#BFD2FF" fallback={<Text style={{ fontSize: 30 }}>🌙</Text>} />
+                <View style={styles.glassBtn}>
+                  <LinearGradient
+                    colors={['rgba(176,196,255,0.16)', 'rgba(120,140,210,0.05)', 'rgba(20,28,60,0.20)']}
+                    start={{ x: 0.3, y: 0.1 }}
+                    end={{ x: 0.7, y: 1 }}
+                    style={StyleSheet.absoluteFill}
+                  />
+                  {/* 上端の反射ハイライト */}
+                  <LinearGradient
+                    colors={['rgba(255,255,255,0.13)', 'transparent']}
+                    start={{ x: 0.5, y: 0 }}
+                    end={{ x: 0.5, y: 1 }}
+                    style={styles.glassShine}
+                  />
+                  <SymbolView name="moon.stars.fill" size={34} tintColor="#CDDCFF" fallback={<Text style={{ fontSize: 28 }}>●</Text>} />
                   <Text style={styles.orbLabel}>おやすみ</Text>
                   <Text style={styles.orbSub}>録音をはじめる</Text>
-                </LinearGradient>
+                </View>
               </Pressable>
             </View>
 
@@ -136,7 +141,7 @@ export default function RecordScreen() {
               枕元に置いて、ボタンを押すだけ。{'\n'}朝、あなたの睡眠サウンドレポートが見られます。
             </Text>
             <View style={styles.privacy}>
-              <SymbolView name="lock.fill" size={12} tintColor={theme.textFaint} fallback={<Text>🔒</Text>} />
+              <SymbolView name="lock.fill" size={12} tintColor={theme.textFaint} fallback={<Text>·</Text>} />
               <Text style={styles.privacyT}>録音はこの端末の中だけで処理されます</Text>
             </View>
             <BottomNav />
@@ -176,37 +181,49 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.bg },
   safe: { flex: 1 },
   idle: { flex: 1 },
-  top: { alignItems: 'center', paddingTop: 8 },
-  eyebrow: { color: theme.accent, fontSize: 11, fontWeight: '800', letterSpacing: 3, opacity: 0.85 },
-  brand: { color: '#F4F7FF', fontSize: 30, fontWeight: '800', letterSpacing: 5, marginTop: 8 },
+  top: { alignItems: 'center', paddingTop: 6 },
+  eyebrow: { color: theme.accent, fontSize: 10.5, fontWeight: '700', letterSpacing: 4, opacity: 0.75 },
+  brand: { color: '#EDF2FF', fontSize: 34, fontWeight: '200', letterSpacing: 14, marginTop: 6, paddingLeft: 14 },
 
   orbWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  halo: { position: 'absolute', borderRadius: 999 },
-  halo1: { width: 300, height: 300, backgroundColor: 'rgba(139,180,255,0.10)' },
-  halo2: { width: 232, height: 232, backgroundColor: 'rgba(182,156,255,0.12)' },
-  ring1: { position: 'absolute', width: 264, height: 264, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(139,180,255,0.18)' },
-  ring2: { position: 'absolute', width: 200, height: 200, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(182,156,255,0.20)' },
-  orbBtn: {
-    width: 172,
-    height: 172,
-    borderRadius: 86,
+  outerRing: {
+    position: 'absolute',
+    width: 218,
+    height: 218,
+    borderRadius: 109,
     borderWidth: 1,
-    borderColor: 'rgba(139,180,255,0.35)',
+    borderColor: 'rgba(176,196,255,0.12)',
+  },
+  glassBtn: {
+    width: 190,
+    height: 190,
+    borderRadius: 95,
+    borderWidth: 1,
+    borderColor: 'rgba(176,196,255,0.30)',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 7,
-    shadowColor: '#7C6CD2',
-    shadowOpacity: 0.5,
-    shadowRadius: 28,
+    gap: 8,
+    overflow: 'hidden',
+    shadowColor: '#7C8CF0',
+    shadowOpacity: 0.45,
+    shadowRadius: 34,
     shadowOffset: { width: 0, height: 0 },
   },
-  orbLabel: { color: '#fff', fontSize: 25, fontWeight: '800', letterSpacing: 1 },
-  orbSub: { color: theme.accent, fontSize: 12, letterSpacing: 1 },
-  pressed: { opacity: 0.75 },
+  glassShine: {
+    position: 'absolute',
+    top: 8,
+    left: 24,
+    right: 24,
+    height: 80,
+    borderRadius: 70,
+  },
+  orbLabel: { color: '#fff', fontSize: 26, fontWeight: '700', letterSpacing: 2 },
+  orbSub: { color: theme.accent, fontSize: 11.5, letterSpacing: 2 },
+  pressed: { opacity: 0.78 },
 
-  tagline: { color: theme.textDim, fontSize: 13.5, lineHeight: 24, textAlign: 'center', paddingHorizontal: 40 },
-  privacy: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 16 },
-  privacyT: { color: theme.textFaint, fontSize: 11.5 },
+  tagline: { color: theme.textDim, fontSize: 13.5, lineHeight: 25, textAlign: 'center', paddingHorizontal: 44, paddingTop: 6 },
+  privacy: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 12 },
+  privacyT: { color: theme.textFaint, fontSize: 11, letterSpacing: 0.3 },
 
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 28 },
   recLabel: { color: theme.accent, fontSize: 14, fontWeight: '700', letterSpacing: 2 },

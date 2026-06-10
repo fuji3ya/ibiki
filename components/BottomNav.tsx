@@ -1,5 +1,6 @@
 import { Link, usePathname } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
 import { theme } from '../lib/theme';
 
@@ -15,6 +16,12 @@ export function BottomNav() {
   const path = usePathname();
   return (
     <View style={styles.bar}>
+      <LinearGradient
+        colors={['transparent', 'rgba(176,196,255,0.18)', 'transparent']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.hairline}
+      />
       {ITEMS.map((it) => {
         const active = path === it.href;
         return (
@@ -38,13 +45,11 @@ export function BottomNav() {
 const styles = StyleSheet.create({
   bar: {
     flexDirection: 'row',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: theme.border,
-    backgroundColor: theme.bg,
-    paddingTop: 8,
-    paddingBottom: 24,
+    paddingTop: 10,
+    paddingBottom: 22,
   },
+  hairline: { position: 'absolute', top: 0, left: 24, right: 24, height: 1 },
   item: { flex: 1 },
-  itemInner: { alignItems: 'center', gap: 3 },
-  label: { fontSize: 11, fontWeight: '700' },
+  itemInner: { alignItems: 'center', gap: 4 },
+  label: { fontSize: 10.5, fontWeight: '700', letterSpacing: 1 },
 });

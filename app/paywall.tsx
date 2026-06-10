@@ -8,6 +8,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { getOfferings, getPlanPrices, purchasePlan, restorePurchases } from '../lib/purchases';
 import { theme } from '../lib/theme';
 import { NightBackground } from '../components/NightBackground';
+import { GlassCard } from '../components/GlassCard';
 
 // ハードペイウォール（2夜目レポート閲覧時）。HTML 承認版の RN 移植。
 // - 価格は StoreKit ライブ値（getPlanPrices、ハードコード禁止・fallback のみ定数）
@@ -97,7 +98,7 @@ export default function PaywallScreen() {
             ゆうべの記録はもう端末の中に。{'\n'}Pro にすると毎朝のレポートがずっと見られます。
           </Text>
 
-          <View style={styles.benefits}>
+          <GlassCard style={styles.benefits} radius={18}>
             {BENEFITS.map((b, i) => (
               <View key={b.text} style={[styles.benefit, i > 0 && styles.benefitDivider]}>
                 <View style={styles.benefitIc}>
@@ -106,7 +107,7 @@ export default function PaywallScreen() {
                 <Text style={styles.benefitT}>{b.text}</Text>
               </View>
             ))}
-          </View>
+          </GlassCard>
 
           <View style={styles.plans}>
             <Pressable onPress={() => setPlan('annual')} style={[styles.plan, plan === 'annual' && styles.planSel]}>
@@ -138,7 +139,7 @@ export default function PaywallScreen() {
           </View>
 
           <Pressable onPress={onPurchase} disabled={busy} style={({ pressed }) => (pressed || busy) && styles.pressed}>
-            <LinearGradient colors={['#7C8CF0', '#5C6CD0']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.cta}>
+            <LinearGradient colors={['#8A97F2', '#6573DC', '#5560C8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.cta}>
               <Text style={styles.ctaT}>{busy ? '処理中…' : ctaLabel}</Text>
             </LinearGradient>
           </Pressable>
@@ -183,14 +184,7 @@ const styles = StyleSheet.create({
   },
   h1: { color: theme.text, fontSize: 25, fontWeight: '800', letterSpacing: -0.3, textAlign: 'center', marginTop: 14 },
   lead: { color: theme.textDim, fontSize: 13.5, lineHeight: 22, textAlign: 'center', marginTop: 7 },
-  benefits: {
-    marginTop: 18,
-    backgroundColor: theme.bgElevated,
-    borderRadius: 18,
-    paddingHorizontal: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.border,
-  },
+  benefits: { marginTop: 18, paddingHorizontal: 16 },
   benefit: { flexDirection: 'row', alignItems: 'center', gap: 13, paddingVertical: 13 },
   benefitDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(255,255,255,0.06)' },
   benefitIc: {
@@ -200,6 +194,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(139,180,255,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(176,196,255,0.18)',
   },
   benefitT: { color: theme.text, fontSize: 14, lineHeight: 20, flex: 1 },
   plans: { marginTop: 18, gap: 10 },
@@ -209,11 +205,18 @@ const styles = StyleSheet.create({
     gap: 12,
     borderRadius: 18,
     padding: 16,
-    backgroundColor: theme.bgElevated,
+    backgroundColor: 'rgba(120,140,200,0.06)',
     borderWidth: 1.5,
-    borderColor: theme.border,
+    borderColor: theme.glassBorder,
   },
-  planSel: { borderColor: theme.accent, backgroundColor: '#1A2342' },
+  planSel: {
+    borderColor: theme.accent,
+    backgroundColor: 'rgba(140,160,230,0.13)',
+    shadowColor: '#7C8CF0',
+    shadowOpacity: 0.4,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 6 },
+  },
   radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: theme.textFaint },
   radioOn: { borderColor: theme.accent, backgroundColor: theme.accent },
   planNm: { color: theme.text, fontSize: 15, fontWeight: '800' },

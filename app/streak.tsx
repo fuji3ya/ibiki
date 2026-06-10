@@ -8,6 +8,7 @@ import { toLocalDateKey } from '../lib/streak';
 import { formatClock, formatDurationJa } from '../lib/format';
 import { theme } from '../lib/theme';
 import { StreakGrid } from '../components/StreakGrid';
+import { GlassCard } from '../components/GlassCard';
 import { NightBackground } from '../components/NightBackground';
 import { BottomNav } from '../components/BottomNav';
 import type { RecordingSession, Streak } from '../store/types';
@@ -43,22 +44,22 @@ export default function StreakScreen() {
         <Text style={styles.title}>連続記録</Text>
 
         <View style={styles.streakRow}>
-          <View style={styles.streakBox}>
+          <GlassCard style={styles.streakBox} radius={16}>
             <SymbolView name="flame.fill" size={26} tintColor={theme.warn} fallback={<Text>🔥</Text>} />
             <Text style={styles.streakNum}>{streak?.current ?? 0}</Text>
             <Text style={styles.streakLabel}>連続</Text>
-          </View>
-          <View style={styles.streakBox}>
+          </GlassCard>
+          <GlassCard style={styles.streakBox} radius={16}>
             <SymbolView name="trophy.fill" size={24} tintColor={theme.accent} fallback={<Text>🏆</Text>} />
             <Text style={styles.streakNum}>{streak?.longest ?? 0}</Text>
             <Text style={styles.streakLabel}>最長</Text>
-          </View>
+          </GlassCard>
         </View>
 
-        <View style={styles.card}>
+        <GlassCard style={styles.card}>
           <Text style={styles.sectionTitle}>この5週間</Text>
           <StreakGrid recordedDates={recorded} />
-        </View>
+        </GlassCard>
 
         <Text style={styles.sectionTitle}>これまでの記録</Text>
         {sessions.length === 0 ? (
@@ -67,9 +68,10 @@ export default function StreakScreen() {
           sessions.map((s) => (
             <Pressable
               key={s.id}
-              style={({ pressed }) => [styles.sessionRow, pressed && styles.pressed]}
+              style={({ pressed }) => pressed && styles.pressed}
               onPress={() => router.push({ pathname: '/report/[sessionId]', params: { sessionId: s.id } })}
             >
+              <GlassCard style={styles.sessionRow} radius={16}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.sessionDate}>{toLocalDateKey(new Date(s.startedAt))}</Text>
                 <Text style={styles.sessionMeta}>
@@ -79,6 +81,7 @@ export default function StreakScreen() {
               <View style={styles.scorePill}>
                 <Text style={styles.scorePillText}>{s.nightlyScore}</Text>
               </View>
+              </GlassCard>
             </Pressable>
           ))
         )}
@@ -97,39 +100,31 @@ const styles = StyleSheet.create({
   streakRow: { flexDirection: 'row', gap: 12 },
   streakBox: {
     flex: 1,
-    backgroundColor: theme.bgElevated,
-    borderRadius: 16,
-    paddingVertical: 20,
+    paddingVertical: 18,
     alignItems: 'center',
     gap: 6,
   },
   streakNum: { color: theme.text, fontSize: 30, fontWeight: '800' },
   streakLabel: { color: theme.textFaint, fontSize: 12 },
-  card: {
-    backgroundColor: theme.bgElevated,
-    borderRadius: 16,
-    padding: 16,
-    gap: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.border,
-  },
+  card: { padding: 16, gap: 12 },
   sectionTitle: { color: theme.text, fontSize: 16, fontWeight: '700' },
   dim: { color: theme.textDim, fontSize: 14, lineHeight: 22 },
   sessionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.bgElevated,
-    borderRadius: 14,
-    padding: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     gap: 12,
   },
   sessionDate: { color: theme.text, fontSize: 15, fontWeight: '700' },
   sessionMeta: { color: theme.textFaint, fontSize: 12, marginTop: 2 },
   scorePill: {
-    minWidth: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: theme.bgElevated2,
+    minWidth: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(60,78,130,0.35)',
+    borderWidth: 1,
+    borderColor: 'rgba(176,196,255,0.30)',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 10,

@@ -14,6 +14,7 @@ import { theme } from '../../lib/theme';
 import { ScoreRing } from '../../components/ScoreRing';
 import { NightBackground } from '../../components/NightBackground';
 import { NightTimeline } from '../../components/NightTimeline';
+import { GlassCard } from '../../components/GlassCard';
 import type { ClassificationEvent, HighlightClip, RecordingSession } from '../../store/types';
 
 const LABEL_JA: Record<ClassificationEvent['label'], string> = {
@@ -117,9 +118,9 @@ export default function ReportScreen() {
         </View>
 
         {/* スコアの根拠（WHY）— 健康系の信頼づくり。医療表現なし。 */}
-        <View style={styles.reasonCard}>
+        <GlassCard style={styles.reasonCard}>
           <Text style={styles.reasonText}>{reason}</Text>
-        </View>
+        </GlassCard>
 
         <View style={styles.statsRow}>
           <Stat label="録音時間" value={formatDurationJa(session.durationSec)} />
@@ -144,23 +145,23 @@ export default function ReportScreen() {
             const playingThis =
               status.playing && Math.abs(status.currentTime - clip.startSec) < 12;
             return (
-              <Pressable
-                key={clip.id}
-                style={({ pressed }) => [styles.clip, pressed && styles.pressed]}
-                onPress={() => playClip(clip)}
-              >
-                <SymbolView
-                  name={playingThis ? 'waveform' : 'play.circle.fill'}
-                  size={28}
-                  tintColor={theme.accent}
-                  fallback={<Text style={{ color: theme.accent, fontSize: 20 }}>▶</Text>}
-                />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.clipLabel}>{LABEL_JA[clip.label]}</Text>
-                  <Text style={styles.clipMeta}>
-                    開始 {formatClock(session.startedAt + clip.startSec * 1000)}・{Math.round(clip.peakDb)} dB
-                  </Text>
-                </View>
+              <Pressable key={clip.id} style={({ pressed }) => pressed && styles.pressed} onPress={() => playClip(clip)}>
+                <GlassCard style={styles.clip}>
+                  <View style={styles.playCircle}>
+                    <SymbolView
+                      name={playingThis ? 'waveform' : 'play.fill'}
+                      size={15}
+                      tintColor="#D6E2FF"
+                      fallback={<Text style={{ color: theme.accent, fontSize: 14 }}>▶</Text>}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.clipLabel}>{LABEL_JA[clip.label]}</Text>
+                    <Text style={styles.clipMeta}>
+                      開始 {formatClock(session.startedAt + clip.startSec * 1000)}・{Math.round(clip.peakDb)} dB
+                    </Text>
+                  </View>
+                </GlassCard>
               </Pressable>
             );
           })
@@ -171,8 +172,8 @@ export default function ReportScreen() {
         </Text>
 
         <Pressable onPress={onShare} style={({ pressed }) => pressed && styles.pressed}>
-          <LinearGradient colors={['#7C8CF0', '#5C6CD0']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.shareBtn}>
-            <SymbolView name="square.and.arrow.up" size={18} tintColor="#fff" fallback={<Text>↑</Text>} />
+          <LinearGradient colors={['#8A97F2', '#6573DC', '#5560C8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.shareBtn}>
+            <SymbolView name="square.and.arrow.up" size={17} tintColor="#fff" fallback={<Text>↑</Text>} />
             <Text style={styles.shareText}>レポートを共有</Text>
           </LinearGradient>
         </Pressable>
@@ -188,54 +189,59 @@ export default function ReportScreen() {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <View style={styles.stat}>
+    <GlassCard style={styles.stat} radius={16}>
       <Text style={styles.statValue}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
-    </View>
+    </GlassCard>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.bg },
   safe: { flex: 1 },
-  scroll: { padding: 22, gap: 18, paddingBottom: 48 },
+  scroll: { padding: 22, gap: 13, paddingBottom: 48 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   dim: { color: theme.textDim, fontSize: 14, textAlign: 'center', lineHeight: 22 },
   link: { color: theme.accent, fontSize: 15, fontWeight: '700' },
-  header: { gap: 4, marginTop: 6 },
-  date: { color: theme.textFaint, fontSize: 13 },
-  title: { color: theme.text, fontSize: 26, fontWeight: '800' },
-  ringWrap: { alignItems: 'center', marginVertical: 6 },
-  reasonCard: {
-    backgroundColor: theme.bgElevated,
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.border,
-  },
-  reasonText: { color: theme.text, fontSize: 15, lineHeight: 24 },
+  header: { gap: 5, marginTop: 4 },
+  date: { color: theme.textFaint, fontSize: 10.5, fontWeight: '700', letterSpacing: 2.5 },
+  title: { color: theme.text, fontSize: 26, fontWeight: '700', letterSpacing: -0.3 },
+  ringWrap: { alignItems: 'center', marginVertical: 2 },
+  reasonCard: { padding: 15 },
+  reasonText: { color: '#DDE6F8', fontSize: 13.5, lineHeight: 23 },
   statsRow: { flexDirection: 'row', gap: 10 },
   stat: {
     flex: 1,
-    backgroundColor: theme.bgElevated,
-    borderRadius: 14,
-    paddingVertical: 16,
+    paddingVertical: 13,
     alignItems: 'center',
-    gap: 4,
+    gap: 5,
   },
-  statValue: { color: theme.text, fontSize: 18, fontWeight: '800' },
-  statLabel: { color: theme.textFaint, fontSize: 11 },
-  sectionTitle: { color: theme.text, fontSize: 17, fontWeight: '700', marginTop: 6 },
+  statValue: { color: theme.text, fontSize: 17, fontWeight: '700', letterSpacing: -0.2 },
+  statLabel: { color: theme.textFaint, fontSize: 9.5, fontWeight: '600', letterSpacing: 1.5 },
+  sectionTitle: { color: theme.text, fontSize: 14.5, fontWeight: '700', marginTop: 2 },
   clip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    backgroundColor: theme.bgElevated,
-    borderRadius: 14,
-    padding: 14,
+    gap: 13,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
   },
-  clipLabel: { color: theme.text, fontSize: 15, fontWeight: '700' },
-  clipMeta: { color: theme.textFaint, fontSize: 12, marginTop: 2 },
+  playCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(60,78,130,0.35)',
+    borderWidth: 1,
+    borderColor: 'rgba(176,196,255,0.35)',
+    shadowColor: '#7C8CF0',
+    shadowOpacity: 0.3,
+    shadowRadius: 9,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  clipLabel: { color: theme.text, fontSize: 14, fontWeight: '700' },
+  clipMeta: { color: theme.textFaint, fontSize: 11, marginTop: 2, letterSpacing: 0.3 },
   pressed: { opacity: 0.7 },
   countNote: { color: theme.textDim, fontSize: 13, textAlign: 'center', marginTop: 4 },
   shareBtn: {
