@@ -22,9 +22,9 @@ type Plan = 'annual' | 'weekly';
 
 const BENEFITS: { icon: SymbolViewProps['name']; text: string }[] = [
   { icon: 'checkmark.circle.fill', text: '毎朝のサウンドレポートを無制限に' },
+  { icon: 'chart.xyaxis.line', text: 'いびきスコアのトレンドと「対策の効果」比較' },
   { icon: 'play.circle.fill', text: '過去の夜のレポートとハイライトをいつでも再生' },
   { icon: 'lightbulb.fill', text: 'いびき対策ガイド — 今夜からできる7つの工夫' },
-  { icon: 'flame.fill', text: '連続記録ストリークと全履歴をずっと' },
 ];
 
 export default function PaywallScreen() {

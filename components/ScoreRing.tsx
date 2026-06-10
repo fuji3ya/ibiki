@@ -1,8 +1,9 @@
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, RadialGradient, Stop } from 'react-native-svg';
+import { scoreBand } from '../lib/scoring';
 
-// 夜間スコアの円グラフ v2（承認 HTML ibiki-screens-v2.html の RN 移植）。
-// 細い 3停止グラデリング + 背面ブルーム + 終端の輝点 + 大きく軽い数字。
+// いびきスコアの円グラフ（B案 2026-06-10: 低いほど良い・SnoreLab語彙・100超あり）。
+// 弧 = min(score,100)/100、色は scoreBand（低=緑/中=琥珀/高=コーラル）。数字は実値表示。
 const BANDS = {
   good: { stops: ['#B6F2D2', '#7ED9A6', '#3F9E7E'], glow: '#7ED9A6', text: '#9ED9BC', dot: '#D8FFE9' },
   warn: { stops: ['#FFE2B0', '#FFC56B', '#D89638'], glow: '#FFC56B', text: '#FFD79A', dot: '#FFF1D6' },
@@ -22,13 +23,14 @@ export function ScoreRing({
 }) {
   const r = (size - stroke - 8) / 2;
   const c = 2 * Math.PI * r;
-  const clamped = Math.max(0, Math.min(100, score));
-  const dash = (clamped / 100) * c;
-  const band = clamped >= 75 ? BANDS.good : clamped >= 50 ? BANDS.warn : BANDS.danger;
+  const shown = Math.max(0, Math.round(score));
+  const arc = Math.max(0, Math.min(100, score)); // 弧は 100 で満タン（数字は実値）
+  const dash = (arc / 100) * c;
+  const band = BANDS[scoreBand(shown)];
   const cx = size / 2;
 
-  // 終端の輝点（12時起点・時計回りで score% の角度）
-  const endAngle = (clamped / 100) * 2 * Math.PI - Math.PI / 2;
+  // 終端の輝点（12時起点・時計回りで arc% の角度）
+  const endAngle = (arc / 100) * 2 * Math.PI - Math.PI / 2;
   const dotX = cx + r * Math.cos(endAngle);
   const dotY = cx + r * Math.sin(endAngle);
 
@@ -82,7 +84,7 @@ export function ScoreRing({
         <Circle cx={dotX} cy={dotY} r={2.8} fill={band.dot} />
       </Svg>
       <View style={styles.center}>
-        <Text style={[styles.score, { color: band.text }]}>{clamped}</Text>
+        <Text style={[styles.score, { color: band.text }]}>{shown}</Text>
         {label ? <Text style={[styles.label, { color: band.text }]}>{label}</Text> : null}
       </View>
     </View>

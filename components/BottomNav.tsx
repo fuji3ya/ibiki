@@ -4,11 +4,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
 import { theme } from '../lib/theme';
 
-type Item = { href: '/' | '/streak' | '/settings'; label: string; icon: SymbolViewProps['name'] };
+type Item = { href: '/' | '/streak' | '/trends' | '/settings'; label: string; icon: SymbolViewProps['name'] };
 
 const ITEMS: Item[] = [
   { href: '/', label: '録音', icon: 'moon.stars.fill' },
   { href: '/streak', label: '記録', icon: 'flame.fill' },
+  { href: '/trends', label: 'トレンド', icon: 'chart.xyaxis.line' },
   { href: '/settings', label: '設定', icon: 'gearshape.fill' },
 ];
 

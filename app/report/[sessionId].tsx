@@ -5,10 +5,18 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { SymbolView } from 'expo-symbols';
-import { getSession, getEvents, getHighlights, countSessions } from '../../lib/db';
+import {
+  getSession,
+  getEvents,
+  getHighlights,
+  countSessions,
+  getSessionRemedies,
+  setSessionRemedies,
+} from '../../lib/db';
 import { isPro } from '../../lib/purchases';
 import { shouldShowHardPaywall } from '../../lib/paywall-gate';
 import { computeNightlyScore, scoreBandLabel } from '../../lib/scoring';
+import { GUIDE_TIPS } from '../../lib/guide-content';
 import { formatDurationJa, formatClock } from '../../lib/format';
 import { theme } from '../../lib/theme';
 import { ScoreRing } from '../../components/ScoreRing';
@@ -34,6 +42,8 @@ export default function ReportScreen() {
   const [loaded, setLoaded] = useState(false);
   // 再生中のクリップ id（トグル停止 + 再生中の見た目に使う）
   const [playingClipId, setPlayingClipId] = useState<string | null>(null);
+  // この夜に試した対策のタグ（トレンドの効果分析に使う）
+  const [remedies, setRemedies] = useState<string[]>([]);
 
   const player = useAudioPlayer(session?.audioFileUri ?? null);
   const status = useAudioPlayerStatus(player);
@@ -67,14 +77,16 @@ export default function ReportScreen() {
         router.replace({ pathname: '/paywall', params: { sessionId } });
         return;
       }
-      const [s, ev, hl] = await Promise.all([
+      const [s, ev, hl, rem] = await Promise.all([
         getSession(sessionId),
         getEvents(sessionId),
         getHighlights(sessionId),
+        getSessionRemedies(sessionId),
       ]);
       setSession(s);
       setEvents(ev);
       setHighlights(hl);
+      setRemedies(rem);
       setLoaded(true);
     })();
   }, [sessionId, router]);
@@ -105,6 +117,13 @@ export default function ReportScreen() {
   const snoreCount = events.filter((e) => e.label === 'snoring').length;
   const peakLabel = peakDb <= -119 ? '—' : `${Math.round(peakDb)} dB`;
 
+  const toggleRemedy = async (id: string) => {
+    if (!sessionId) return;
+    const next = remedies.includes(id) ? remedies.filter((r) => r !== id) : [...remedies, id];
+    setRemedies(next);
+    await setSessionRemedies(sessionId, next);
+  };
+
   const playClip = async (clip: HighlightClip) => {
     if (!session.audioFileUri) return;
     // 同じクリップをもう一度タップ → 停止（トグル）
@@ -123,7 +142,7 @@ export default function ReportScreen() {
     await Share.share({
       message:
         `🌙 ゆうべの睡眠サウンドレポート\n` +
-        `夜の静かさスコア ${session.nightlyScore}／100\n` +
+        `いびきスコア ${session.nightlyScore}（低いほど静か）\n` +
         `いびき 約${mins}分・最大音量 ${peakLabel}\n` +
         `#いびき`,
     });
@@ -142,9 +161,9 @@ export default function ReportScreen() {
         </View>
 
         <View style={styles.ringWrap}>
-          <Text style={styles.scoreKind}>夜の静かさスコア</Text>
+          <Text style={styles.scoreKind}>いびきスコア</Text>
           <ScoreRing score={session.nightlyScore} label={scoreBandLabel(session.nightlyScore)} />
-          <Text style={styles.scoreKindNote}>いびきの時間と音量から算出（高いほど静かな夜）</Text>
+          <Text style={styles.scoreKindNote}>いびきの音量 × 時間で算出（低いほど静かな夜）</Text>
         </View>
 
         {/* スコアの根拠（WHY）— 健康系の信頼づくり。医療表現なし。 */}
@@ -199,6 +218,26 @@ export default function ReportScreen() {
         <Text style={styles.countNote}>
           いびき {snoreCount} 回・寝言 {events.filter((e) => e.label === 'sleep_talk').length} 回を記録
         </Text>
+
+        {/* 対策×効果トラッキング: この夜に試した対策をタグ付け → トレンドで効果を比較 */}
+        <Text style={styles.sectionTitle}>この夜に試したこと</Text>
+        <GlassCard style={styles.remedyCard}>
+          <View style={styles.chips}>
+            {GUIDE_TIPS.map((tip) => {
+              const on = remedies.includes(tip.id);
+              return (
+                <Pressable
+                  key={tip.id}
+                  onPress={() => toggleRemedy(tip.id)}
+                  style={[styles.chip, on && styles.chipOn]}
+                >
+                  <Text style={[styles.chipT, on && styles.chipTOn]}>{tip.title}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Text style={styles.remedyHint}>タグ付けすると、トレンドで「試した夜」と「試してない夜」のスコアをくらべられます</Text>
+        </GlassCard>
 
         <Pressable onPress={onShare} style={({ pressed }) => pressed && styles.pressed}>
           <LinearGradient colors={['#8A97F2', '#6573DC', '#5560C8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.shareBtn}>
@@ -280,6 +319,23 @@ const styles = StyleSheet.create({
   clipMeta: { color: theme.textFaint, fontSize: 11, marginTop: 2, letterSpacing: 0.3 },
   pressed: { opacity: 0.7 },
   countNote: { color: theme.textDim, fontSize: 13, textAlign: 'center', marginTop: 4 },
+  remedyCard: { padding: 14 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: {
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: theme.glassBorder,
+    backgroundColor: 'rgba(120,140,200,0.06)',
+  },
+  chipOn: {
+    borderColor: theme.accent,
+    backgroundColor: 'rgba(140,160,230,0.18)',
+  },
+  chipT: { color: theme.textDim, fontSize: 12.5, fontWeight: '600' },
+  chipTOn: { color: theme.text, fontWeight: '700' },
+  remedyHint: { color: theme.textFaint, fontSize: 10.5, lineHeight: 16, marginTop: 11 },
   shareBtn: {
     flexDirection: 'row',
     gap: 8,

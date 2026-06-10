@@ -55,6 +55,11 @@ async function getDb(): Promise<SQLite.SQLiteDatabase> {
           longest INTEGER NOT NULL,
           lastNightDate TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS session_remedies (
+          sessionId TEXT NOT NULL,
+          remedyId TEXT NOT NULL,
+          PRIMARY KEY (sessionId, remedyId)
+        );
       `);
       return db;
     })();
@@ -136,6 +141,38 @@ export async function getHighlights(sessionId: string): Promise<HighlightClip[]>
   return db.getAllAsync<HighlightClip>(
     `SELECT * FROM highlights WHERE sessionId = ? ORDER BY peakDb DESC`,
     [sessionId]
+  );
+}
+
+// --- session remedies（その夜に試した対策のタグ） ---
+
+export async function setSessionRemedies(sessionId: string, remedyIds: string[]): Promise<void> {
+  const db = await getDb();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(`DELETE FROM session_remedies WHERE sessionId = ?`, [sessionId]);
+    for (const rid of remedyIds) {
+      await db.runAsync(
+        `INSERT OR REPLACE INTO session_remedies (sessionId, remedyId) VALUES (?, ?)`,
+        [sessionId, rid]
+      );
+    }
+  });
+}
+
+export async function getSessionRemedies(sessionId: string): Promise<string[]> {
+  const db = await getDb();
+  const rows = await db.getAllAsync<{ remedyId: string }>(
+    `SELECT remedyId FROM session_remedies WHERE sessionId = ?`,
+    [sessionId]
+  );
+  return rows.map((r) => r.remedyId);
+}
+
+// 全セッションの対策タグ（トレンドの効果分析用）。
+export async function getAllSessionRemedies(): Promise<{ sessionId: string; remedyId: string }[]> {
+  const db = await getDb();
+  return db.getAllAsync<{ sessionId: string; remedyId: string }>(
+    `SELECT sessionId, remedyId FROM session_remedies`
   );
 }
 
