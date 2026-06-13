@@ -91,6 +91,10 @@ public class IbikiSoundModule: Module {
     } catch {
       throw AnalyzeError.request
     }
+    // 解析コスト削減: ウィンドウ重なりを無くす（既定 0.5 → 0.0 で推論回数を約半減）。
+    // 一晩録音でも処理を現実的な時間に収める。睡眠音(いびき)は数秒持続するため、
+    // 重なり無し・非重複ウィンドウでも検出に十分。後段のピーク算出も非重複前提で速い。
+    request.overlapFactor = 0.0
 
     let observer = Observer()
     do {
@@ -125,18 +129,32 @@ public class IbikiSoundModule: Module {
   // 各ウィンドウ [startSec,endSec) のピーク振幅 → dBFS を埋める。
   // 全長を一度にメモリへ載せず、フレームをブロック読みして該当ウィンドウへ加算する
   // （一晩録音でもメモリ安全）。チャンネルは平均してモノラル化。
+  //
+  // 計算量: O(サンプル数 + ウィンドウ数)。サンプルもウィンドウも時系列順なので、
+  // 単調増加カーソル(widx)で対応ウィンドウを追う。以前は各サンプルで全ウィンドウを
+  // 線形探索しており O(サンプル数 × ウィンドウ数) = 一晩録音(約4.6億サンプル × 約1.9万
+  // ウィンドウ)で実質ハングしていた。これがレポートが出ない原因だった。
   private static func fillPeakDb(url: URL, windows: inout [Window]) {
     guard !windows.isEmpty, let file = try? AVAudioFile(forReading: url) else { return }
     let format = file.processingFormat
     let sampleRate = format.sampleRate
     guard sampleRate > 0 else { return }
 
-    var peaks = [Float](repeating: 0, count: windows.count)
-    let blockFrames: AVAudioFrameCount = 16_384
+    // 防御的に開始時刻でソートした順序を作り、その順にカーソルを進める
+    // （overlapFactor=0 で非重複だが、順不同で来ても安全に処理できるように）。
+    let order = windows.indices.sorted { windows[$0].startSec < windows[$1].startSec }
+    let count = order.count
+    let starts = order.map { windows[$0].startSec }
+    let ends = order.map { windows[$0].endSec }
+    var peaks = [Float](repeating: 0, count: count)
+
+    let blockFrames: AVAudioFrameCount = 65_536
     guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: blockFrames) else { return }
+    let channelCount = Int(format.channelCount)
 
     var framePos: AVAudioFramePosition = 0
-    while true {
+    var widx = 0 // 単調増加カーソル（戻らない）
+    readLoop: while true {
       buffer.frameLength = 0
       do {
         try file.read(into: buffer, frameCount: blockFrames)
@@ -146,27 +164,28 @@ public class IbikiSoundModule: Module {
       let n = Int(buffer.frameLength)
       if n == 0 { break }
       guard let channels = buffer.floatChannelData else { break }
-      let channelCount = Int(format.channelCount)
 
       for i in 0..<n {
-        // モノラル化（全チャンネル平均）。
-        var sum: Float = 0
-        for c in 0..<channelCount { sum += channels[c][i] }
-        let amp = abs(sum / Float(channelCount))
         let t = Double(framePos + AVAudioFramePosition(i)) / sampleRate
-        // 該当ウィンドウを線形探索（ウィンドウは時系列順・少数）。
-        for (wi, w) in windows.enumerated() where t >= w.startSec && t < w.endSec {
-          if amp > peaks[wi] { peaks[wi] = amp }
-          break
+        // 終わったウィンドウを飛ばす（t が終端以上）。カーソルは前進のみ。
+        while widx < count && t >= ends[widx] { widx += 1 }
+        if widx >= count { break readLoop } // 最後のウィンドウを過ぎた → 残りサンプル不要
+        if t >= starts[widx] {
+          // モノラル化（全チャンネル平均）。ウィンドウ内サンプルのみ計算。
+          var sum: Float = 0
+          for c in 0..<channelCount { sum += channels[c][i] }
+          let amp = abs(sum / Float(channelCount))
+          if amp > peaks[widx] { peaks[widx] = amp }
         }
+        // t < starts[widx] はウィンドウ間ギャップ → スキップ
       }
       framePos += AVAudioFramePosition(n)
       if n < Int(blockFrames) { break }
     }
 
-    for wi in windows.indices {
-      let p = max(peaks[wi], 1e-6)
-      windows[wi].peakDb = Double(20.0 * log10(p)) // dBFS（<= 0）
+    for k in 0..<count {
+      let p = max(peaks[k], 1e-6)
+      windows[order[k]].peakDb = Double(20.0 * log10(p)) // dBFS（<= 0）
     }
   }
 }

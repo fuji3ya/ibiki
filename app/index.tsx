@@ -37,7 +37,16 @@ export default function RecordScreen() {
   const state = useAudioRecorderState(recorder, 500);
   const [phase, setPhase] = useState<Phase>('idle');
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
+  const [procElapsed, setProcElapsed] = useState(0);
   const startedAt = useRef<number>(0);
+
+  // 処理中の経過秒（永久スピナーに見せない・動いていることを伝える）。
+  useEffect(() => {
+    if (phase !== 'processing') return;
+    setProcElapsed(0);
+    const t = setInterval(() => setProcElapsed((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [phase]);
 
   // 初回起動はオンボへ（O1-O4）。チェックが済むまで描画しない（フラッシュ防止）。
   useEffect(() => {
@@ -87,6 +96,13 @@ export default function RecordScreen() {
         endedAt: Date.now(),
       });
       setPhase('idle');
+      // 解析が時間切れでも保存は済んでいるので必ずレポートへ。空の可能性だけ伝える。
+      if (result.analysisTimedOut) {
+        Alert.alert(
+          'レポートを表示します',
+          '音の分析に時間がかかったため、一部の結果が含まれていないことがあります。',
+        );
+      }
       router.push({ pathname: '/report/[sessionId]', params: { sessionId: result.session.id } });
     } catch (e) {
       console.warn('[ibiki] stop/process failed', e);
@@ -188,6 +204,12 @@ export default function RecordScreen() {
             <ActivityIndicator size="large" color={theme.accent} />
             <Text style={styles.processing}>サウンドレポートを作成中…</Text>
             <Text style={styles.processingSub}>端末の中で音を分析しているよ</Text>
+            <Text style={styles.processingTime}>{formatElapsed(procElapsed)}</Text>
+            {procElapsed >= 20 && (
+              <Text style={styles.processingHint}>
+                長く録音した夜ほど、分析に少し時間がかかります。{'\n'}そのままお待ちください。
+              </Text>
+            )}
           </View>
         )}
       </SafeAreaView>
@@ -273,4 +295,6 @@ const styles = StyleSheet.create({
   wakeBtnSub: { color: '#fff', fontSize: 12, opacity: 0.85 },
   processing: { color: theme.text, fontSize: 18, fontWeight: '700', marginTop: 8 },
   processingSub: { color: theme.textDim, fontSize: 13 },
+  processingTime: { color: theme.textFaint, fontSize: 13, fontVariant: ['tabular-nums'], marginTop: 6 },
+  processingHint: { color: theme.textFaint, fontSize: 12, lineHeight: 19, textAlign: 'center', marginTop: 10 },
 });

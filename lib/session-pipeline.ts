@@ -25,7 +25,37 @@ export type ProcessResult = {
   highlights: HighlightClip[];
   score: ScoreResult;
   streak: Streak;
+  analysisTimedOut: boolean;
 };
+
+// 端末内分析が万一返ってこなくても UI を永久ハングさせないための上限。
+// O(n) 化 + overlapFactor=0 で一晩録音でも通常は数十秒〜数分で終わる想定。
+// この時間を超えたら「その時点までの結果（空でも可）」でレポートを作り、必ず画面を出す。
+const ANALYZE_TIMEOUT_MS = 8 * 60 * 1000;
+
+// p が ms 以内に解決しなければ fallback を返す（p 自体は reject しても fallback を返す）。
+// p はバックグラウンドで走り続けるが、呼び出し側はブロックされない。
+function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<{ value: T; timedOut: boolean }> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      resolve({ value: fallback, timedOut: true });
+    }, ms);
+    p.then((value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve({ value, timedOut: false });
+    }).catch(() => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve({ value: fallback, timedOut: false });
+    });
+  });
+}
 
 export async function processRecording(params: {
   audioFileUri: string;
@@ -37,9 +67,19 @@ export async function processRecording(params: {
   const sessionId = uid('s_');
 
   // 1) 端末内分類（未対応端末や解析失敗でも落とさず空配列で続行）。
+  //    解析が ANALYZE_TIMEOUT_MS を超えたら諦めて空で続行 → レポート画面は必ず出す
+  //    （永久スピナー＝レポートが出ない、を物理的に防ぐ）。
   let raw: Awaited<ReturnType<typeof classifyFile>> = [];
+  let analysisTimedOut = false;
   try {
-    if (isSupported()) raw = await classifyFile(audioFileUri);
+    if (isSupported()) {
+      const r = await withTimeout(classifyFile(audioFileUri), ANALYZE_TIMEOUT_MS, [] as typeof raw);
+      raw = r.value;
+      analysisTimedOut = r.timedOut;
+      if (r.timedOut) {
+        console.warn('[ibiki] classifyFile timed out after', ANALYZE_TIMEOUT_MS, 'ms');
+      }
+    }
   } catch (e) {
     console.warn('[ibiki] classifyFile failed', e instanceof Error ? e.message : e);
   }
@@ -68,5 +108,5 @@ export async function processRecording(params: {
   const streak = updateStreak(prev, toLocalDateKey(new Date(endedAt)));
   await saveStreak(streak);
 
-  return { session, events, highlights, score, streak };
+  return { session, events, highlights, score, streak, analysisTimedOut };
 }
