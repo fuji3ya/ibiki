@@ -1,5 +1,5 @@
 import { Link, usePathname } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
 import { theme } from '../lib/theme';
@@ -25,17 +25,20 @@ export function BottomNav() {
       />
       {ITEMS.map((it) => {
         const active = path === it.href;
+        const color = active ? theme.accent : theme.textFaint;
         return (
-          <Link key={it.href} href={it.href} style={styles.item}>
-            <View style={styles.itemInner}>
+          // asChild で flex を実 View(Pressable) に効かせる。Link 直接に flex:1 を
+          // 当てると実機でタブが等間隔にならず左寄りになるバグの修正。
+          <Link key={it.href} href={it.href} asChild>
+            <Pressable style={styles.item}>
               <SymbolView
                 name={it.icon}
                 size={22}
-                tintColor={active ? theme.accent : theme.textFaint}
-                fallback={<Text style={{ color: active ? theme.accent : theme.textFaint }}>●</Text>}
+                tintColor={color}
+                fallback={<Text style={{ color }}>●</Text>}
               />
-              <Text style={[styles.label, { color: active ? theme.accent : theme.textFaint }]}>{it.label}</Text>
-            </View>
+              <Text style={[styles.label, { color }]}>{it.label}</Text>
+            </Pressable>
           </Link>
         );
       })}
@@ -46,11 +49,12 @@ export function BottomNav() {
 const styles = StyleSheet.create({
   bar: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
     paddingTop: 10,
     paddingBottom: 22,
+    paddingHorizontal: 8,
   },
   hairline: { position: 'absolute', top: 0, left: 24, right: 24, height: 1 },
-  item: { flex: 1 },
-  itemInner: { alignItems: 'center', gap: 4 },
+  item: { flex: 1, alignItems: 'center', gap: 4 },
   label: { fontSize: 10.5, fontWeight: '700', letterSpacing: 1 },
 });

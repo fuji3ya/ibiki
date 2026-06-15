@@ -27,6 +27,7 @@ import { theme } from '../lib/theme';
 import { NightBackground } from '../components/NightBackground';
 import { GlassCard } from '../components/GlassCard';
 import { BottomNav } from '../components/BottomNav';
+import { SleepOrb } from '../components/SleepOrb';
 
 type Phase = 'idle' | 'recording' | 'processing';
 
@@ -120,7 +121,7 @@ export default function RecordScreen() {
 
   return (
     <View style={styles.root}>
-      <NightBackground width={width} height={height} variant="landscape" />
+      <NightBackground width={width} height={height} variant="landscape" scrim />
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
         {phase === 'idle' && (
           <View style={styles.idle}>
@@ -129,36 +130,9 @@ export default function RecordScreen() {
               <Text style={styles.brand}>いびき</Text>
             </View>
 
-            {/* signature: 夜空に浮かぶガラスの就寝ボタン（v2）。
-                centering は固定サイズの orbStack に絶対座標で重ねて構造的に保証
-                （実機 Fabric で flex の absolute 配置が左端に寄るバグの恒久対策）。 */}
+            {/* signature: 夜空に浮かぶ「呼吸するガラス球」(v2 = SleepOrb)。 */}
             <View style={styles.orbWrap}>
-              <View style={styles.orbStack}>
-                <View style={styles.outerRing} pointerEvents="none" />
-                <Pressable
-                  onPress={onSleep}
-                  style={({ pressed }) => [styles.orbPress, pressed && styles.pressed]}
-                >
-                  <View style={styles.glassBtn}>
-                    <LinearGradient
-                      colors={['rgba(176,196,255,0.16)', 'rgba(120,140,210,0.05)', 'rgba(20,28,60,0.20)']}
-                      start={{ x: 0.3, y: 0.1 }}
-                      end={{ x: 0.7, y: 1 }}
-                      style={StyleSheet.absoluteFill}
-                    />
-                    {/* 上端の反射ハイライト */}
-                    <LinearGradient
-                      colors={['rgba(255,255,255,0.13)', 'transparent']}
-                      start={{ x: 0.5, y: 0 }}
-                      end={{ x: 0.5, y: 1 }}
-                      style={styles.glassShine}
-                    />
-                    <SymbolView name="moon.stars.fill" size={34} tintColor="#CDDCFF" fallback={<Text style={{ fontSize: 28 }}>●</Text>} />
-                    <Text style={styles.orbLabel}>おやすみ</Text>
-                    <Text style={styles.orbSub}>録音をはじめる</Text>
-                  </View>
-                </Pressable>
-              </View>
+              <SleepOrb onPress={onSleep} />
             </View>
 
             <Text style={styles.tagline}>
@@ -226,44 +200,6 @@ const styles = StyleSheet.create({
   brand: { color: '#EDF2FF', fontSize: 34, fontWeight: '200', letterSpacing: 14, marginTop: 6, paddingLeft: 14 },
 
   orbWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  // 固定サイズのスタック: ring と button を絶対座標で重ね、親 flex の挙動差に依存しない
-  orbStack: { width: 218, height: 218, alignSelf: 'center' },
-  outerRing: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: 218,
-    height: 218,
-    borderRadius: 109,
-    borderWidth: 1,
-    borderColor: 'rgba(176,196,255,0.12)',
-  },
-  orbPress: { position: 'absolute', top: 14, left: 14 },
-  glassBtn: {
-    width: 190,
-    height: 190,
-    borderRadius: 95,
-    borderWidth: 1,
-    borderColor: 'rgba(176,196,255,0.30)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    overflow: 'hidden',
-    shadowColor: '#7C8CF0',
-    shadowOpacity: 0.45,
-    shadowRadius: 34,
-    shadowOffset: { width: 0, height: 0 },
-  },
-  glassShine: {
-    position: 'absolute',
-    top: 8,
-    left: 24,
-    right: 24,
-    height: 80,
-    borderRadius: 70,
-  },
-  orbLabel: { color: '#fff', fontSize: 26, fontWeight: '700', letterSpacing: 2 },
-  orbSub: { color: theme.accent, fontSize: 11.5, letterSpacing: 2 },
   pressed: { opacity: 0.78 },
 
   tagline: { color: theme.textDim, fontSize: 13.5, lineHeight: 25, textAlign: 'center', paddingHorizontal: 44, paddingTop: 6 },
