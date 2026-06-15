@@ -106,6 +106,32 @@ export function computeScoreDelta(
   };
 }
 
+// --- 今夜の一歩（行動変容: see → understand → act を閉じる）---
+// 2026-06-13 cross-opinion(Gemma4) 反映: レポートが過去分析に留まらず「次にどうするか」
+// を必ず1つ提示する。効いている対策があれば継続を、無ければ未試行の対策を薦める。
+
+export type NextStep = {
+  kind: 'keep' | 'try' | 'encourage';
+  remedyId: string | null; // keep/try のとき対象の対策 id
+  delta: number | null; // keep のとき効果量（負 = スコアが下がった）
+};
+
+export function recommendNextStep(
+  effects: RemedyEffect[], // computeRemedyEffects の結果（delta 昇順）
+  triedRemedyIds: string[], // これまでに一度でも試した対策 id
+  allTipIds: string[] // ガイドの全対策 id
+): NextStep {
+  // 1) はっきり効いている対策（スコアが3以上下がり・両群2夜以上）→ 継続を促す。
+  const working = effects.find((e) => e.delta <= -3 && e.nightsWith >= 2 && e.nightsWithout >= 2);
+  if (working) return { kind: 'keep', remedyId: working.remedyId, delta: working.delta };
+  // 2) まだ試していない対策があれば1つ薦める。
+  const tried = new Set(triedRemedyIds);
+  const untried = allTipIds.find((id) => !tried.has(id));
+  if (untried) return { kind: 'try', remedyId: untried, delta: null };
+  // 3) すべて試し済みで決定打が無い → 継続観察を促す。
+  return { kind: 'encourage', remedyId: null, delta: null };
+}
+
 // --- 夜の読み解き（最も多かった時間帯・最長の静かな区間）---
 
 export type NightInsight = {

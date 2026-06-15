@@ -13,12 +13,20 @@ import {
   listSessions,
   getSessionRemedies,
   setSessionRemedies,
+  getAllSessionRemedies,
 } from '../../lib/db';
 import { isPro } from '../../lib/purchases';
 import { shouldShowHardPaywall } from '../../lib/paywall-gate';
 import { computeNightlyScore, scoreBandLabel } from '../../lib/scoring';
 import { computeIntensityBreakdown } from '../../lib/intensity';
-import { computeScoreDelta, summarizeNight, type ScoreDelta } from '../../lib/insights';
+import {
+  computeScoreDelta,
+  computeRemedyEffects,
+  recommendNextStep,
+  summarizeNight,
+  type ScoreDelta,
+  type NextStep,
+} from '../../lib/insights';
 import { GUIDE_TIPS } from '../../lib/guide-content';
 import { formatDurationJa, formatClock } from '../../lib/format';
 import { theme } from '../../lib/theme';
@@ -50,6 +58,8 @@ export default function ReportScreen() {
   const [remedies, setRemedies] = useState<string[]>([]);
   // 前夜・平均との差分（単発レポートをトレンドに繋ぐ）
   const [delta, setDelta] = useState<ScoreDelta | null>(null);
+  // 今夜の一歩（行動変容: see→understand→act）
+  const [nextStep, setNextStep] = useState<NextStep | null>(null);
 
   const player = useAudioPlayer(session?.audioFileUri ?? null);
   const status = useAudioPlayerStatus(player);
@@ -83,12 +93,13 @@ export default function ReportScreen() {
         router.replace({ pathname: '/paywall', params: { sessionId } });
         return;
       }
-      const [s, ev, hl, rem, all] = await Promise.all([
+      const [s, ev, hl, rem, all, allTags] = await Promise.all([
         getSession(sessionId),
         getEvents(sessionId),
         getHighlights(sessionId),
         getSessionRemedies(sessionId),
         listSessions(),
+        getAllSessionRemedies(),
       ]);
       setSession(s);
       setEvents(ev);
@@ -101,6 +112,10 @@ export default function ReportScreen() {
           .sort((a, b) => b.startedAt - a.startedAt)
           .map((x) => x.nightlyScore);
         setDelta(computeScoreDelta(s.nightlyScore, priorNewestFirst));
+        // 今夜の一歩: 効いてる対策の継続 or 未試行の対策を1つ薦める。
+        const effects = computeRemedyEffects(all, allTags);
+        const tried = [...new Set(allTags.map((t) => t.remedyId))];
+        setNextStep(recommendNextStep(effects, tried, GUIDE_TIPS.map((t) => t.id)));
       }
       setLoaded(true);
     })();
@@ -141,6 +156,19 @@ export default function ReportScreen() {
     insight.peakStartSec != null
       ? formatClock(session.startedAt + (insight.peakStartSec + 3600) * 1000)
       : null;
+
+  // 今夜の一歩（行動変容）の文言を対策タイトルから合成。
+  const tipTitle = (id: string | null) => GUIDE_TIPS.find((t) => t.id === id)?.title ?? '';
+  let nextStepText: string | null = null;
+  if (nextStep) {
+    if (nextStep.kind === 'keep' && nextStep.remedyId) {
+      nextStepText = `「${tipTitle(nextStep.remedyId)}」を試した夜は、スコアが平均 ${Math.abs(nextStep.delta ?? 0)} 低めでした。今夜も続けてみましょう。`;
+    } else if (nextStep.kind === 'try' && nextStep.remedyId) {
+      nextStepText = `まだ試していない「${tipTitle(nextStep.remedyId)}」を、今夜ためしてみましょう。`;
+    } else {
+      nextStepText = 'いまの習慣を続けて、夜ごとの変化を見守りましょう。';
+    }
+  }
 
   const toggleRemedy = async (id: string) => {
     if (!sessionId) return;
@@ -297,6 +325,17 @@ export default function ReportScreen() {
           <Text style={styles.remedyHint}>タグ付けすると、トレンドで「試した夜」と「試してない夜」のスコアをくらべられます</Text>
         </GlassCard>
 
+        {/* 今夜の一歩（行動変容: 過去分析で終わらせず次の行動を必ず1つ提示）。 */}
+        {nextStepText && (
+          <GlassCard style={styles.nextCard}>
+            <View style={styles.nextHead}>
+              <SymbolView name="sunrise.fill" size={15} tintColor={theme.warn} fallback={<Text>·</Text>} />
+              <Text style={styles.nextLabel}>今夜の一歩</Text>
+            </View>
+            <Text style={styles.nextText}>{nextStepText}</Text>
+          </GlassCard>
+        )}
+
         <Pressable onPress={onShare} style={({ pressed }) => pressed && styles.pressed}>
           <LinearGradient colors={['#8A97F2', '#6573DC', '#5560C8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.shareBtn}>
             <SymbolView name="square.and.arrow.up" size={17} tintColor="#fff" fallback={<Text>↑</Text>} />
@@ -363,6 +402,10 @@ const styles = StyleSheet.create({
   },
   insightT: { color: theme.text, fontSize: 13, fontWeight: '700' },
   insightS: { color: theme.textDim, fontSize: 12, lineHeight: 18, marginTop: 3 },
+  nextCard: { padding: 15, gap: 8 },
+  nextHead: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  nextLabel: { color: theme.warn, fontSize: 11, fontWeight: '700', letterSpacing: 1.5 },
+  nextText: { color: '#EAF0FF', fontSize: 13.5, lineHeight: 22 },
   statsRow: { flexDirection: 'row', gap: 10 },
   stat: {
     flex: 1,

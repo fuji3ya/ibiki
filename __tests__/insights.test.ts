@@ -3,6 +3,7 @@ import {
   buildTrendSeries,
   computeRemedyEffects,
   computeScoreDelta,
+  recommendNextStep,
   summarizeNight,
 } from '../lib/insights';
 import { toLocalDateKey } from '../lib/streak';
@@ -117,5 +118,34 @@ describe('summarizeNight', () => {
     expect(r.peakSnoreSec).toBe(900);
     // longest quiet = trailing gap 4*3600 - 4600 = 9800s ≈ 163min
     expect(r.longestQuietMin).toBe(Math.round((4 * 3600 - 4600) / 60));
+  });
+});
+
+describe('recommendNextStep', () => {
+  const tips = ['side', 'pillow', 'alcohol', 'tape', 'humid'];
+
+  it('keep: recommends continuing a clearly working remedy', () => {
+    const effects = [
+      { remedyId: 'side', nightsWith: 3, nightsWithout: 3, avgWith: 12, avgWithout: 30, delta: -18 },
+    ];
+    const r = recommendNextStep(effects, ['side'], tips);
+    expect(r.kind).toBe('keep');
+    expect(r.remedyId).toBe('side');
+    expect(r.delta).toBe(-18);
+  });
+
+  it('try: suggests an untried remedy when nothing clearly works yet', () => {
+    const r = recommendNextStep([], ['side'], tips);
+    expect(r.kind).toBe('try');
+    expect(r.remedyId).toBe('pillow');
+  });
+
+  it('does not treat a weak/under-sampled effect as working', () => {
+    const effects = [
+      { remedyId: 'side', nightsWith: 1, nightsWithout: 1, avgWith: 10, avgWithout: 30, delta: -20 },
+    ];
+    const r = recommendNextStep(effects, tips, tips);
+    expect(r.kind).toBe('encourage');
+    expect(r.remedyId).toBeNull();
   });
 });
