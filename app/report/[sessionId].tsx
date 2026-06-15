@@ -10,18 +10,22 @@ import {
   getEvents,
   getHighlights,
   countSessions,
+  listSessions,
   getSessionRemedies,
   setSessionRemedies,
 } from '../../lib/db';
 import { isPro } from '../../lib/purchases';
 import { shouldShowHardPaywall } from '../../lib/paywall-gate';
 import { computeNightlyScore, scoreBandLabel } from '../../lib/scoring';
+import { computeIntensityBreakdown } from '../../lib/intensity';
+import { computeScoreDelta, summarizeNight, type ScoreDelta } from '../../lib/insights';
 import { GUIDE_TIPS } from '../../lib/guide-content';
 import { formatDurationJa, formatClock } from '../../lib/format';
 import { theme } from '../../lib/theme';
 import { ScoreRing } from '../../components/ScoreRing';
 import { NightBackground } from '../../components/NightBackground';
 import { NightTimeline } from '../../components/NightTimeline';
+import { IntensityBar } from '../../components/IntensityBar';
 import { GlassCard } from '../../components/GlassCard';
 import type { ClassificationEvent, HighlightClip, RecordingSession } from '../../store/types';
 
@@ -44,6 +48,8 @@ export default function ReportScreen() {
   const [playingClipId, setPlayingClipId] = useState<string | null>(null);
   // この夜に試した対策のタグ（トレンドの効果分析に使う）
   const [remedies, setRemedies] = useState<string[]>([]);
+  // 前夜・平均との差分（単発レポートをトレンドに繋ぐ）
+  const [delta, setDelta] = useState<ScoreDelta | null>(null);
 
   const player = useAudioPlayer(session?.audioFileUri ?? null);
   const status = useAudioPlayerStatus(player);
@@ -77,16 +83,25 @@ export default function ReportScreen() {
         router.replace({ pathname: '/paywall', params: { sessionId } });
         return;
       }
-      const [s, ev, hl, rem] = await Promise.all([
+      const [s, ev, hl, rem, all] = await Promise.all([
         getSession(sessionId),
         getEvents(sessionId),
         getHighlights(sessionId),
         getSessionRemedies(sessionId),
+        listSessions(),
       ]);
       setSession(s);
       setEvents(ev);
       setHighlights(hl);
       setRemedies(rem);
+      // この夜より前のセッションのスコアを新しい順で渡し、前夜/平均との差分を出す。
+      if (s) {
+        const priorNewestFirst = all
+          .filter((x) => x.startedAt < s.startedAt)
+          .sort((a, b) => b.startedAt - a.startedAt)
+          .map((x) => x.nightlyScore);
+        setDelta(computeScoreDelta(s.nightlyScore, priorNewestFirst));
+      }
       setLoaded(true);
     })();
   }, [sessionId, router]);
@@ -116,6 +131,16 @@ export default function ReportScreen() {
   });
   const snoreCount = events.filter((e) => e.label === 'snoring').length;
   const peakLabel = peakDb <= -119 ? '—' : `${Math.round(peakDb)} dB`;
+  const breakdown = computeIntensityBreakdown(events);
+  const insight = summarizeNight(events, session.durationSec);
+  // 差分ピル: 負 = 静かになった(改善)。前夜が無ければ出さない。
+  const deltaPrev = delta?.deltaPrev ?? null;
+  const peakClock =
+    insight.peakStartSec != null ? formatClock(session.startedAt + insight.peakStartSec * 1000) : null;
+  const peakEndClock =
+    insight.peakStartSec != null
+      ? formatClock(session.startedAt + (insight.peakStartSec + 3600) * 1000)
+      : null;
 
   const toggleRemedy = async (id: string) => {
     if (!sessionId) return;
@@ -163,6 +188,19 @@ export default function ReportScreen() {
         <View style={styles.ringWrap}>
           <Text style={styles.scoreKind}>いびきスコア</Text>
           <ScoreRing score={session.nightlyScore} label={scoreBandLabel(session.nightlyScore)} />
+          {deltaPrev != null && deltaPrev !== 0 && (
+            <View style={[styles.deltaPill, deltaPrev < 0 ? styles.deltaGood : styles.deltaUp]}>
+              <SymbolView
+                name={deltaPrev < 0 ? 'arrow.down' : 'arrow.up'}
+                size={12}
+                tintColor={deltaPrev < 0 ? theme.good : theme.warn}
+                fallback={<Text style={{ color: deltaPrev < 0 ? theme.good : theme.warn }}>{deltaPrev < 0 ? '↓' : '↑'}</Text>}
+              />
+              <Text style={styles.deltaText}>
+                前夜より {Math.abs(deltaPrev)} {deltaPrev < 0 ? 'すくない・静かな夜' : '多め'}
+              </Text>
+            </View>
+          )}
           <Text style={styles.scoreKindNote}>いびきの音量 × 時間で算出（低いほど静かな夜）</Text>
         </View>
 
@@ -170,6 +208,26 @@ export default function ReportScreen() {
         <GlassCard style={styles.reasonCard}>
           <Text style={styles.reasonText}>{reason}</Text>
         </GlassCard>
+
+        {/* いびきの強さ4段階内訳（signature の深み） */}
+        <IntensityBar data={breakdown} />
+
+        {/* 夜の読み解きインサイト（最盛時間帯 + 最長の静寂） */}
+        {breakdown.totalSec > 0 && peakClock && (
+          <GlassCard style={styles.insightCard}>
+            <View style={styles.insightIc}>
+              <SymbolView name="moon.stars.fill" size={17} tintColor="#BFD2FF" fallback={<Text>·</Text>} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.insightT}>{peakClock} ごろが、いちばん多めでした</Text>
+              {insight.longestQuietMin > 0 && (
+                <Text style={styles.insightS}>
+                  最長 {formatDurationJa(insight.longestQuietMin * 60)} はとても静かでした。
+                </Text>
+              )}
+            </View>
+          </GlassCard>
+        )}
 
         <View style={styles.statsRow}>
           <Stat label="録音時間" value={formatDurationJa(session.durationSec)} />
@@ -277,8 +335,34 @@ const styles = StyleSheet.create({
   ringWrap: { alignItems: 'center', marginVertical: 2, gap: 2 },
   scoreKind: { color: theme.textDim, fontSize: 11.5, fontWeight: '700', letterSpacing: 2.5 },
   scoreKindNote: { color: theme.textFaint, fontSize: 10.5, letterSpacing: 0.3 },
+  deltaPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 999,
+    borderWidth: 1,
+    marginTop: 10,
+  },
+  deltaGood: { backgroundColor: 'rgba(126,217,166,0.12)', borderColor: 'rgba(126,217,166,0.30)' },
+  deltaUp: { backgroundColor: 'rgba(255,197,107,0.12)', borderColor: 'rgba(255,197,107,0.30)' },
+  deltaText: { color: '#CFE9DA', fontSize: 12.5, fontWeight: '600' },
   reasonCard: { padding: 15 },
   reasonText: { color: '#DDE6F8', fontSize: 13.5, lineHeight: 23 },
+  insightCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 14 },
+  insightIc: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(143,181,255,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(176,196,255,0.18)',
+  },
+  insightT: { color: theme.text, fontSize: 13, fontWeight: '700' },
+  insightS: { color: theme.textDim, fontSize: 12, lineHeight: 18, marginTop: 3 },
   statsRow: { flexDirection: 'row', gap: 10 },
   stat: {
     flex: 1,

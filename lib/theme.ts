@@ -17,6 +17,11 @@ export const theme = {
   danger: '#FF8BA0',
   snore: '#B49CFF', // いびき
   talk: '#6FE0D0', // 寝言
+  // いびき強度4段階（intensity.ts の TIER_ORDER 対応: しずか→特大）
+  tierQuiet: '#6FE0D0',
+  tierLight: '#8FB5FF',
+  tierLoud: '#FFC56B',
+  tierEpic: '#FF8BA0',
   // v2 ガラス質感（承認 HTML ibiki-screens-v2.html のトークン）
   glassTop: 'rgba(150,170,225,0.085)',
   glassBottom: 'rgba(110,128,185,0.045)',

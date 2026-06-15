@@ -1,6 +1,23 @@
 import { describe, it, expect } from 'vitest';
-import { buildTrendSeries, computeRemedyEffects } from '../lib/insights';
+import {
+  buildTrendSeries,
+  computeRemedyEffects,
+  computeScoreDelta,
+  summarizeNight,
+} from '../lib/insights';
 import { toLocalDateKey } from '../lib/streak';
+import type { ClassificationEvent } from '../store/types';
+
+const cev = (over: Partial<ClassificationEvent>): ClassificationEvent => ({
+  id: 'e',
+  sessionId: 'S',
+  label: 'snoring',
+  startSec: 0,
+  endSec: 10,
+  peakDb: -20,
+  confidence: 0.9,
+  ...over,
+});
 
 const sess = (id: string, day: number, score: number) => ({
   id,
@@ -57,5 +74,48 @@ describe('computeRemedyEffects', () => {
     ];
     const out = computeRemedyEffects(sessions, tags);
     expect(out.map((e) => e.remedyId)).toEqual(['good-one', 'meh-one']);
+  });
+});
+
+describe('computeScoreDelta', () => {
+  it('no prior nights → all null, sampleCount 0', () => {
+    const r = computeScoreDelta(30, []);
+    expect(r).toEqual({ prevScore: null, avgScore: null, deltaPrev: null, sampleCount: 0 });
+  });
+
+  it('negative deltaPrev means quieter than last night', () => {
+    const r = computeScoreDelta(20, [35, 40, 30]); // prev = 35 (newest first)
+    expect(r.prevScore).toBe(35);
+    expect(r.deltaPrev).toBe(-15);
+    expect(r.avgScore).toBe(35); // (35+40+30)/3
+    expect(r.sampleCount).toBe(3);
+  });
+
+  it('positive deltaPrev means louder than last night', () => {
+    const r = computeScoreDelta(50, [30]);
+    expect(r.deltaPrev).toBe(20);
+  });
+});
+
+describe('summarizeNight', () => {
+  it('no snoring → whole night is the quiet stretch, no peak', () => {
+    const r = summarizeNight([cev({ label: 'ambient' })], 8 * 3600);
+    expect(r.peakStartSec).toBeNull();
+    expect(r.peakSnoreSec).toBe(0);
+    expect(r.longestQuietMin).toBe(480);
+  });
+
+  it('finds the loudest hour and the longest quiet gap', () => {
+    const r = summarizeNight(
+      [
+        cev({ startSec: 600, endSec: 660 }), // 1st hour: 60s
+        cev({ startSec: 3700, endSec: 4600 }), // 2nd hour: 900s ← peak
+      ],
+      4 * 3600
+    );
+    expect(r.peakStartSec).toBe(3600); // hour bin 1
+    expect(r.peakSnoreSec).toBe(900);
+    // longest quiet = trailing gap 4*3600 - 4600 = 9800s ≈ 163min
+    expect(r.longestQuietMin).toBe(Math.round((4 * 3600 - 4600) / 60));
   });
 });
