@@ -176,6 +176,20 @@ export async function getAllSessionRemedies(): Promise<{ sessionId: string; reme
   );
 }
 
+// --- 全データ消去（設定の「データを消去」用） ---
+// 端末内の記録（セッション/イベント/ハイライト/対策タグ/ストリーク）を全削除。
+// 音源ファイルの削除は呼び出し側（settings）で FileSystem 経由で行う。
+export async function clearAllData(): Promise<void> {
+  const db = await getDb();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync('DELETE FROM events');
+    await db.runAsync('DELETE FROM highlights');
+    await db.runAsync('DELETE FROM session_remedies');
+    await db.runAsync('DELETE FROM sessions');
+    await db.runAsync('DELETE FROM streak');
+  });
+}
+
 // --- streak ---
 
 export async function getStreak(): Promise<Streak | null> {

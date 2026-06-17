@@ -95,7 +95,7 @@ export default function PaywallScreen() {
           </LinearGradient>
           <Text style={styles.h1}>ここからは いびき Pro で</Text>
           <Text style={styles.lead}>
-            無料で見られる3夜分の記録は端末の中に。{'\n'}Pro にすると毎朝のレポートがずっと見られます。
+            無料で見られる5夜分の記録は端末の中に。{'\n'}Pro にすると毎朝のレポートがずっと見られます。
           </Text>
 
           <GlassCard style={styles.benefits} radius={18}>

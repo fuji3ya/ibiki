@@ -13,6 +13,7 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SymbolView } from 'expo-symbols';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system';
 import { useAudioRecorder, useAudioRecorderState } from 'expo-audio';
 import { StorageKeys } from '../lib/storage-keys';
 import {
@@ -78,6 +79,35 @@ export default function RecordScreen() {
       Alert.alert('録音を開始できませんでした', 'もう一度試してね。');
       setPhase('idle');
     }
+  };
+
+  // 間違って録音を始めたときの取り消し。保存・解析せず破棄してホームへ戻る。
+  // 一晩の録音を誤って捨てないよう確認を挟む。
+  const onCancel = () => {
+    Alert.alert('録音をやめますか？', 'この録音は保存されず、破棄されます。', [
+      { text: '録音を続ける', style: 'cancel' },
+      {
+        text: '破棄する',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await recorder.stop();
+            const uri = recorder.uri;
+            await releaseRecordingAudioMode();
+            if (uri) {
+              try {
+                await FileSystem.deleteAsync(uri, { idempotent: true });
+              } catch {
+                /* ファイルが無くても無視 */
+              }
+            }
+          } catch (e) {
+            console.warn('[ibiki] cancel failed', e);
+          }
+          setPhase('idle');
+        },
+      },
+    ]);
   };
 
   const onWake = async () => {
@@ -170,6 +200,10 @@ export default function RecordScreen() {
                 <Text style={styles.wakeBtnSub}>録音をとめてレポートを見る</Text>
               </LinearGradient>
             </Pressable>
+            {/* 間違って録音を始めたとき用の取り消し（破棄）。 */}
+            <Pressable onPress={onCancel} hitSlop={10} style={({ pressed }) => [styles.cancelBtn, pressed && styles.pressed]}>
+              <Text style={styles.cancelText}>録音をやめる（保存しない）</Text>
+            </Pressable>
           </View>
         )}
 
@@ -229,6 +263,8 @@ const styles = StyleSheet.create({
   wakeBtn: { marginTop: 36, paddingHorizontal: 44, paddingVertical: 18, borderRadius: 18, alignItems: 'center', gap: 2 },
   wakeBtnText: { color: '#fff', fontSize: 20, fontWeight: '800' },
   wakeBtnSub: { color: '#fff', fontSize: 12, opacity: 0.85 },
+  cancelBtn: { marginTop: 18, paddingVertical: 8, paddingHorizontal: 16 },
+  cancelText: { color: theme.textFaint, fontSize: 13, fontWeight: '600', letterSpacing: 0.3 },
   processing: { color: theme.text, fontSize: 18, fontWeight: '700', marginTop: 8 },
   processingSub: { color: theme.textDim, fontSize: 13 },
   processingTime: { color: theme.textFaint, fontSize: 13, fontVariant: ['tabular-nums'], marginTop: 6 },

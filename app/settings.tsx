@@ -3,9 +3,11 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, Vi
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
+import * as FileSystem from 'expo-file-system';
 import Constants from 'expo-constants';
 import { AudioModule } from 'expo-audio';
 import { isPro, restorePurchases } from '../lib/purchases';
+import { listSessions, clearAllData } from '../lib/db';
 import { theme } from '../lib/theme';
 import { NightBackground } from '../components/NightBackground';
 import { GlassCard } from '../components/GlassCard';
@@ -53,6 +55,42 @@ export default function SettingsScreen() {
     Alert.alert(ok ? '購入を復元しました' : '復元できる購入はありませんでした');
   };
 
+  // すべての記録を削除（取り消し不可なので確認を挟む）。音源ファイルも消す。
+  const onDeleteAll = () => {
+    Alert.alert(
+      'すべてのデータを消去',
+      '録音した記録・レポート・連続記録をすべて削除します。この操作は取り消せません。',
+      [
+        { text: 'キャンセル', style: 'cancel' },
+        {
+          text: '消去する',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const sessions = await listSessions();
+              await Promise.all(
+                sessions.map(async (s) => {
+                  if (s.audioFileUri) {
+                    try {
+                      await FileSystem.deleteAsync(s.audioFileUri, { idempotent: true });
+                    } catch {
+                      /* ファイルが無くても無視 */
+                    }
+                  }
+                })
+              );
+              await clearAllData();
+              Alert.alert('消去しました', 'すべての記録を削除しました。');
+            } catch (e) {
+              console.warn('[ibiki] deleteAll', e);
+              Alert.alert('消去できませんでした', 'もう一度お試しください。');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <View style={styles.root}>
       <NightBackground width={width} height={height} />
@@ -94,6 +132,15 @@ export default function SettingsScreen() {
           </Pressable>
         </GlassCard>
 
+        <GlassCard style={styles.card}>
+          <Pressable onPress={onDeleteAll}>
+            <Text style={[styles.action, styles.danger]}>すべてのデータを消去</Text>
+          </Pressable>
+        </GlassCard>
+        <Text style={styles.dangerHint}>
+          端末内の記録・レポート・連続記録をすべて削除します（取り消せません）。
+        </Text>
+
         <Text style={styles.version}>いびき v{Constants.expoConfig?.version ?? '1.0.0'}</Text>
         <Text style={styles.privacyNote}>
           録音はこの端末の中だけで処理され、外部に送信されません。
@@ -130,6 +177,8 @@ const styles = StyleSheet.create({
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14 },
   hint: { color: theme.textFaint, fontSize: 12, marginTop: 4, lineHeight: 18 },
   action: { color: theme.accent, fontSize: 15, fontWeight: '700', paddingVertical: 14 },
+  danger: { color: theme.danger },
+  dangerHint: { color: theme.textFaint, fontSize: 11.5, lineHeight: 17, paddingHorizontal: 4, marginTop: -6 },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(176,196,255,0.10)' },
   version: { color: theme.textFaint, fontSize: 12, textAlign: 'center', marginTop: 8 },
   privacyNote: { color: theme.textFaint, fontSize: 12, textAlign: 'center', lineHeight: 18 },
