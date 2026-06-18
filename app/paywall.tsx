@@ -79,6 +79,15 @@ export default function PaywallScreen() {
   };
 
   const ctaLabel = plan === 'annual' ? (hasTrial ? '7日間無料で始める' : '年間プランで始める') : '週間プランで始める';
+  const annualBilled = prices.annual.replace(' / 年', '').trim();
+  const weeklyBilled = prices.weekly.replace(' / 週', '').trim();
+  // 3.1.2(c): 自動課金開始・継続・解約の明文化（プラン別）。
+  const disclosure =
+    plan === 'annual'
+      ? hasTrial
+        ? `7日間の無料トライアル終了後、${annualBilled}／年が自動で課金され、解約するまで毎年自動更新されます。期間終了の24時間前までに、いつでも解約できます。`
+        : `${annualBilled}／年が自動で課金され、解約するまで毎年自動更新されます。いつでも解約できます。`
+      : `${weeklyBilled}／週が自動で課金され、解約するまで毎週自動更新されます。いつでも解約できます。`;
 
   return (
     <View style={styles.root}>
@@ -140,13 +149,22 @@ export default function PaywallScreen() {
 
           <Pressable onPress={onPurchase} disabled={busy} style={({ pressed }) => (pressed || busy) && styles.pressed}>
             <LinearGradient colors={['#8A97F2', '#6573DC', '#5560C8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.cta}>
-              <Text style={styles.ctaT}>{busy ? '処理中…' : ctaLabel}</Text>
+              {busy ? (
+                <Text style={styles.ctaT}>処理中…</Text>
+              ) : plan === 'annual' && hasTrial ? (
+                // 3.1.2(c): トライアル CTA は「その後の自動課金額」を同等の目立ち度でボタン自体に出す。
+                <>
+                  <Text style={styles.ctaT}>7日間無料で始める</Text>
+                  <Text style={styles.ctaSub}>その後 {annualBilled}／年・自動更新</Text>
+                </>
+              ) : (
+                <Text style={styles.ctaT}>{ctaLabel}</Text>
+              )}
             </LinearGradient>
           </Pressable>
 
-          {hasTrial && (
-            <Text style={styles.fine}>無料期間終了の24時間前までに解約すれば料金はかかりません。</Text>
-          )}
+          {/* 3.1.2(c): 全 auto-renewable サブスクで「自動課金開始・解約まで継続」を明文化。 */}
+          <Text style={styles.fine}>{disclosure}</Text>
           <View style={styles.links}>
             <Pressable onPress={onRestore}><Text style={styles.link}>購入を復元</Text></Pressable>
             <Text style={styles.linkSep}>・</Text>
@@ -234,8 +252,9 @@ const styles = StyleSheet.create({
     backgroundColor: theme.warn,
   },
   badgeT: { color: '#1A1330', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
-  cta: { marginTop: 16, height: 56, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  cta: { marginTop: 16, minHeight: 60, paddingVertical: 10, borderRadius: 17, alignItems: 'center', justifyContent: 'center', gap: 2 },
   ctaT: { color: '#fff', fontSize: 16.5, fontWeight: '800' },
+  ctaSub: { color: 'rgba(255,255,255,0.92)', fontSize: 12, fontWeight: '600' },
   pressed: { opacity: 0.75 },
   fine: { color: theme.textFaint, fontSize: 11, lineHeight: 18, textAlign: 'center', marginTop: 12 },
   links: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 8 },
