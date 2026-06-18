@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, Share, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Share, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import * as FileSystem from 'expo-file-system';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -14,6 +15,7 @@ import {
   getSessionRemedies,
   setSessionRemedies,
   getAllSessionRemedies,
+  deleteSession,
 } from '../../lib/db';
 import { isPro } from '../../lib/purchases';
 import { shouldShowHardPaywall } from '../../lib/paywall-gate';
@@ -190,6 +192,32 @@ export default function ReportScreen() {
     setPlayingClipId(clip.id);
   };
 
+  // この夜の記録だけを削除（取り消し不可なので確認を挟む）。音源も消す。
+  const onDelete = () => {
+    Alert.alert('この記録を削除', 'この夜の記録とレポートを削除します。取り消せません。', [
+      { text: 'キャンセル', style: 'cancel' },
+      {
+        text: '削除する',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            if (session?.audioFileUri) {
+              try {
+                await FileSystem.deleteAsync(session.audioFileUri, { idempotent: true });
+              } catch {
+                /* ファイルが無くても無視 */
+              }
+            }
+            await deleteSession(sessionId);
+          } catch (e) {
+            console.warn('[ibiki] deleteSession', e);
+          }
+          router.replace('/streak');
+        },
+      },
+    ]);
+  };
+
   const onShare = async () => {
     const mins = Math.round(snoringSec / 60);
     await Share.share({
@@ -346,6 +374,9 @@ export default function ReportScreen() {
         <Pressable onPress={() => router.replace('/')} style={styles.homeBtn}>
           <Text style={styles.link}>ホームに戻る</Text>
         </Pressable>
+        <Pressable onPress={onDelete} style={styles.deleteBtn} hitSlop={8}>
+          <Text style={styles.deleteText}>この記録を削除</Text>
+        </Pressable>
       </ScrollView>
       </SafeAreaView>
     </View>
@@ -474,4 +505,6 @@ const styles = StyleSheet.create({
   },
   shareText: { color: '#fff', fontSize: 16, fontWeight: '800' },
   homeBtn: { alignItems: 'center', paddingVertical: 8 },
+  deleteBtn: { alignItems: 'center', paddingVertical: 10 },
+  deleteText: { color: theme.danger, fontSize: 13, fontWeight: '600' },
 });

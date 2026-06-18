@@ -1,9 +1,10 @@
 import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { getStreak, listSessions } from '../lib/db';
+import * as FileSystem from 'expo-file-system';
+import { getStreak, listSessions, deleteSession } from '../lib/db';
 import { toLocalDateKey } from '../lib/streak';
 import { formatClock, formatDurationJa } from '../lib/format';
 import { theme } from '../lib/theme';
@@ -19,6 +20,12 @@ export default function StreakScreen() {
   const [streak, setStreak] = useState<Streak | null>(null);
   const [sessions, setSessions] = useState<RecordingSession[]>([]);
 
+  const load = useCallback(async () => {
+    const [s, list] = await Promise.all([getStreak(), listSessions()]);
+    setStreak(s);
+    setSessions(list);
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       let alive = true;
@@ -33,6 +40,33 @@ export default function StreakScreen() {
       };
     }, [])
   );
+
+  // この日だけ削除（取り消し不可なので確認を挟む）。音源も消して一覧を更新。
+  const onDeleteRow = (s: RecordingSession) => {
+    const dateKey = toLocalDateKey(new Date(s.startedAt));
+    Alert.alert('この記録を削除', `${dateKey} の記録を削除します。取り消せません。`, [
+      { text: 'キャンセル', style: 'cancel' },
+      {
+        text: '削除する',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            if (s.audioFileUri) {
+              try {
+                await FileSystem.deleteAsync(s.audioFileUri, { idempotent: true });
+              } catch {
+                /* ファイルが無くても無視 */
+              }
+            }
+            await deleteSession(s.id);
+          } catch (e) {
+            console.warn('[ibiki] deleteSession', e);
+          }
+          await load();
+        },
+      },
+    ]);
+  };
 
   const recorded = new Set(sessions.map((s) => toLocalDateKey(new Date(s.startedAt))));
 
@@ -66,23 +100,25 @@ export default function StreakScreen() {
           <Text style={styles.dim}>まだ記録がないよ。今夜、枕元に置いてみよう。</Text>
         ) : (
           sessions.map((s) => (
-            <Pressable
-              key={s.id}
-              style={({ pressed }) => pressed && styles.pressed}
-              onPress={() => router.push({ pathname: '/report/[sessionId]', params: { sessionId: s.id } })}
-            >
-              <GlassCard style={styles.sessionRow} radius={16}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.sessionDate}>{toLocalDateKey(new Date(s.startedAt))}</Text>
-                <Text style={styles.sessionMeta}>
-                  {formatClock(s.startedAt)}–{formatClock(s.endedAt)}・{formatDurationJa(s.durationSec)}
-                </Text>
-              </View>
-              <View style={styles.scorePill}>
-                <Text style={styles.scorePillText}>{s.nightlyScore}</Text>
-              </View>
-              </GlassCard>
-            </Pressable>
+            <GlassCard key={s.id} style={styles.sessionRow} radius={16}>
+              <Pressable
+                style={({ pressed }) => [styles.sessionMain, pressed && styles.pressed]}
+                onPress={() => router.push({ pathname: '/report/[sessionId]', params: { sessionId: s.id } })}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.sessionDate}>{toLocalDateKey(new Date(s.startedAt))}</Text>
+                  <Text style={styles.sessionMeta}>
+                    {formatClock(s.startedAt)}–{formatClock(s.endedAt)}・{formatDurationJa(s.durationSec)}
+                  </Text>
+                </View>
+                <View style={styles.scorePill}>
+                  <Text style={styles.scorePillText}>{s.nightlyScore}</Text>
+                </View>
+              </Pressable>
+              <Pressable onPress={() => onDeleteRow(s)} hitSlop={8} style={({ pressed }) => [styles.trashBtn, pressed && styles.pressed]}>
+                <SymbolView name="trash" size={16} tintColor={theme.textFaint} fallback={<Text style={{ color: theme.textFaint }}>✕</Text>} />
+              </Pressable>
+            </GlassCard>
           ))
         )}
       </ScrollView>
@@ -114,8 +150,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     paddingHorizontal: 14,
-    gap: 12,
+    gap: 6,
   },
+  sessionMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  trashBtn: { paddingLeft: 8, paddingVertical: 6, alignItems: 'center', justifyContent: 'center' },
   sessionDate: { color: theme.text, fontSize: 15, fontWeight: '700' },
   sessionMeta: { color: theme.textFaint, fontSize: 12, marginTop: 2 },
   scorePill: {

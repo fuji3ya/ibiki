@@ -176,6 +176,20 @@ export async function getAllSessionRemedies(): Promise<{ sessionId: string; reme
   );
 }
 
+// --- 単一セッション削除（「この日だけ消す」用） ---
+// 1夜分の記録（セッション + イベント + ハイライト + 対策タグ）を削除。
+// 音源ファイルの削除は呼び出し側（report/streak）で FileSystem 経由で行う。
+// streak カウンタは再計算しない（次の録音で更新される。過去夜削除の影響は軽微）。
+export async function deleteSession(id: string): Promise<void> {
+  const db = await getDb();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync('DELETE FROM events WHERE sessionId = ?', [id]);
+    await db.runAsync('DELETE FROM highlights WHERE sessionId = ?', [id]);
+    await db.runAsync('DELETE FROM session_remedies WHERE sessionId = ?', [id]);
+    await db.runAsync('DELETE FROM sessions WHERE id = ?', [id]);
+  });
+}
+
 // --- 全データ消去（設定の「データを消去」用） ---
 // 端末内の記録（セッション/イベント/ハイライト/対策タグ/ストリーク）を全削除。
 // 音源ファイルの削除は呼び出し側（settings）で FileSystem 経由で行う。
