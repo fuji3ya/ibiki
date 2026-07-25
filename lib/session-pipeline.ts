@@ -13,6 +13,7 @@ import {
   insertSession,
   insertEvents,
   insertHighlights,
+  deleteSession,
   getStreak,
   saveStreak,
 } from './db';
@@ -99,9 +100,20 @@ export async function processRecording(params: {
     nightlyScore: score.score,
     createdAt: endedAt,
   };
+  // 部分書き込み耐性: events/highlights の insert に失敗したら session 行ごと消して
+  // 「開くと空のレポート」という orphan session を残さない（deleteSession は cascade 削除）。
   await insertSession(session);
-  await insertEvents(events);
-  await insertHighlights(highlights);
+  try {
+    await insertEvents(events);
+    await insertHighlights(highlights);
+  } catch (e) {
+    try {
+      await deleteSession(session.id);
+    } catch {
+      /* ロールバック自体の失敗は握らず元エラーを優先 */
+    }
+    throw e;
+  }
 
   // 4) ストリーク更新（当夜＝録音終了日のローカル日付）。
   const prev = await getStreak();

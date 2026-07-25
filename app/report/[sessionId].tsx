@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, Share, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { tapLight } from '../../lib/haptics';
 import * as FileSystem from 'expo-file-system';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -307,7 +308,17 @@ export default function ReportScreen() {
           highlights.map((clip) => {
             const playingThis = playingClipId === clip.id && status.playing;
             return (
-              <Pressable key={clip.id} style={({ pressed }) => pressed && styles.pressed} onPress={() => playClip(clip)}>
+              <Pressable
+                key={clip.id}
+                accessibilityRole="button"
+                accessibilityLabel={`${LABEL_JA[clip.label]}のハイライトを${playingThis ? '停止' : '再生'}`}
+                accessibilityState={{ selected: playingThis }}
+                style={({ pressed }) => pressed && styles.pressed}
+                onPress={() => {
+                  tapLight();
+                  playClip(clip);
+                }}
+              >
                 <GlassCard style={styles.clip}>
                   <View style={[styles.playCircle, playingThis && styles.playCircleActive]}>
                     <SymbolView

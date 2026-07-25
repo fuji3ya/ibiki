@@ -6,6 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
 import * as WebBrowser from 'expo-web-browser';
 import { getOfferings, getPlanPrices, purchasePlan, restorePurchases } from '../lib/purchases';
+import { select, notifySuccess, notifyWarning } from '../lib/haptics';
 import { theme } from '../lib/theme';
 import { NightBackground } from '../components/NightBackground';
 import { GlassCard } from '../components/GlassCard';
@@ -62,10 +63,12 @@ export default function PaywallScreen() {
     try {
       const ok = await purchasePlan(plan);
       if (ok) {
+        notifySuccess();
         leave();
       }
     } catch (e) {
       console.warn('[ibiki] purchase', e);
+      notifyWarning();
       Alert.alert('購入を完了できませんでした', 'もう一度試してね。');
     } finally {
       setBusy(false);
@@ -119,7 +122,16 @@ export default function PaywallScreen() {
           </GlassCard>
 
           <View style={styles.plans}>
-            <Pressable onPress={() => setPlan('annual')} style={[styles.plan, plan === 'annual' && styles.planSel]}>
+            <Pressable
+              onPress={() => {
+                select();
+                setPlan('annual');
+              }}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: plan === 'annual' }}
+              accessibilityLabel={`年間プラン ${prices.annual}${hasTrial ? '、7日間の無料トライアル付き' : ''}`}
+              style={[styles.plan, plan === 'annual' && styles.planSel]}
+            >
               <View style={styles.badge}>
                 <Text style={styles.badgeT}>{hasTrial ? '7日間無料 ・ 68% OFF' : '68% OFF'}</Text>
               </View>
@@ -134,7 +146,16 @@ export default function PaywallScreen() {
               </View>
             </Pressable>
 
-            <Pressable onPress={() => setPlan('weekly')} style={[styles.plan, plan === 'weekly' && styles.planSel]}>
+            <Pressable
+              onPress={() => {
+                select();
+                setPlan('weekly');
+              }}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: plan === 'weekly' }}
+              accessibilityLabel={`週間プラン ${prices.weekly}`}
+              style={[styles.plan, plan === 'weekly' && styles.planSel]}
+            >
               <View style={[styles.radio, plan === 'weekly' && styles.radioOn]} />
               <View>
                 <Text style={styles.planNm}>週間プラン</Text>
@@ -147,7 +168,14 @@ export default function PaywallScreen() {
             </Pressable>
           </View>
 
-          <Pressable onPress={onPurchase} disabled={busy} style={({ pressed }) => (pressed || busy) && styles.pressed}>
+          <Pressable
+            onPress={onPurchase}
+            disabled={busy}
+            accessibilityRole="button"
+            accessibilityLabel={ctaLabel}
+            accessibilityState={{ disabled: busy, busy }}
+            style={({ pressed }) => (pressed || busy) && styles.pressed}
+          >
             <LinearGradient colors={['#8A97F2', '#6573DC', '#5560C8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.cta}>
               {busy ? (
                 <Text style={styles.ctaT}>処理中…</Text>

@@ -2,6 +2,7 @@ import { Link, usePathname } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
+import { tapLight } from '../lib/haptics';
 import { theme } from '../lib/theme';
 
 type Item = { href: '/' | '/streak' | '/trends' | '/settings'; label: string; icon: SymbolViewProps['name'] };
@@ -30,7 +31,15 @@ export function BottomNav() {
           // asChild で flex を実 View(Pressable) に効かせる。Link 直接に flex:1 を
           // 当てると実機でタブが等間隔にならず左寄りになるバグの修正。
           <Link key={it.href} href={it.href} asChild>
-            <Pressable style={styles.item}>
+            <Pressable
+              style={styles.item}
+              onPressIn={() => {
+                if (!active) tapLight();
+              }}
+              accessibilityRole="tab"
+              accessibilityLabel={it.label}
+              accessibilityState={{ selected: active }}
+            >
               <SymbolView
                 name={it.icon}
                 size={22}

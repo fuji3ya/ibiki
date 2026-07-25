@@ -1,14 +1,20 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, RadialGradient, Stop } from 'react-native-svg';
 import { scoreBand } from '../lib/scoring';
 
 // いびきスコアの円グラフ（B案 2026-06-10: 低いほど良い・SnoreLab語彙・100超あり）。
 // 弧 = min(score,100)/100、色は scoreBand（低=緑/中=琥珀/高=コーラル）。数字は実値表示。
+// v2 (2026-06-26): マウント時に弧をスイープ描画 + 数字をカウントアップ。
+// SVG 属性は native driver 非対応なので useNativeDriver:false（900ms の一回きりなので許容）。
 const BANDS = {
   good: { stops: ['#B6F2D2', '#7ED9A6', '#3F9E7E'], glow: '#7ED9A6', text: '#9ED9BC', dot: '#D8FFE9' },
   warn: { stops: ['#FFE2B0', '#FFC56B', '#D89638'], glow: '#FFC56B', text: '#FFD79A', dot: '#FFF1D6' },
   danger: { stops: ['#FFC4D0', '#FF8BA0', '#D95E78'], glow: '#FF8BA0', text: '#FFB0C0', dot: '#FFE3E9' },
 } as const;
+
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+const SWEEP_MS = 900;
 
 export function ScoreRing({
   score,
@@ -34,6 +40,36 @@ export function ScoreRing({
   const dotX = cx + r * Math.cos(endAngle);
   const dotY = cx + r * Math.sin(endAngle);
 
+  // スイープ進捗 0→1。弧は strokeDashoffset を c→c-dash に流して描き、
+  // 数字は同じ進捗で 0→実値へカウントアップ。輝点はスイープ完了際に浮かぶ。
+  const progress = useRef(new Animated.Value(0)).current;
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    const id = progress.addListener(({ value }) => {
+      setCount(Math.round(shown * value));
+    });
+    Animated.timing(progress, {
+      toValue: 1,
+      duration: SWEEP_MS,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+    return () => progress.removeListener(id);
+    // score が変わることは実運用で無い（レポートは不変）が、変わったら描き直す。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shown]);
+
+  const dashOffset = progress.interpolate({ inputRange: [0, 1], outputRange: [c, c - dash] });
+  const dotOpacity = progress.interpolate({
+    inputRange: [0, 0.75, 1],
+    outputRange: [0, 0, 1],
+  });
+  const dotHaloOpacity = progress.interpolate({
+    inputRange: [0, 0.75, 1],
+    outputRange: [0, 0, 0.5],
+  });
+
   return (
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
       <Svg width={size} height={size}>
@@ -54,8 +90,8 @@ export function ScoreRing({
         {/* トラック（内側に1px の締め線） */}
         <Circle cx={cx} cy={cx} r={r} stroke="#141B3A" strokeWidth={stroke} fill="none" />
         <Circle cx={cx} cy={cx} r={r} stroke="#0A0F26" strokeWidth={1} strokeOpacity={0.8} fill="none" />
-        {/* 発光の下敷き弧（太く薄く） */}
-        <Circle
+        {/* 発光の下敷き弧（太く薄く）— 本体と同じ進捗でスイープ */}
+        <AnimatedCircle
           cx={cx}
           cy={cx}
           r={r}
@@ -63,12 +99,13 @@ export function ScoreRing({
           strokeWidth={stroke + 7}
           fill="none"
           strokeLinecap="round"
-          strokeDasharray={`${dash} ${c - dash}`}
+          strokeDasharray={`${c} ${c}`}
+          strokeDashoffset={dashOffset}
           strokeOpacity={0.22}
           transform={`rotate(-90 ${cx} ${cx})`}
         />
         {/* 本体弧 */}
-        <Circle
+        <AnimatedCircle
           cx={cx}
           cy={cx}
           r={r}
@@ -76,15 +113,16 @@ export function ScoreRing({
           strokeWidth={stroke}
           fill="none"
           strokeLinecap="round"
-          strokeDasharray={`${dash} ${c - dash}`}
+          strokeDasharray={`${c} ${c}`}
+          strokeDashoffset={dashOffset}
           transform={`rotate(-90 ${cx} ${cx})`}
         />
-        {/* 終端の輝点 */}
-        <Circle cx={dotX} cy={dotY} r={4.5} fill={band.dot} opacity={0.5} />
-        <Circle cx={dotX} cy={dotY} r={2.8} fill={band.dot} />
+        {/* 終端の輝点（スイープ完了際にふわっと出す） */}
+        <AnimatedCircle cx={dotX} cy={dotY} r={4.5} fill={band.dot} opacity={dotHaloOpacity} />
+        <AnimatedCircle cx={dotX} cy={dotY} r={2.8} fill={band.dot} opacity={dotOpacity} />
       </Svg>
       <View style={styles.center}>
-        <Text style={[styles.score, { color: band.text }]}>{shown}</Text>
+        <Text style={[styles.score, { color: band.text }]}>{count}</Text>
         {label ? <Text style={[styles.label, { color: band.text }]}>{label}</Text> : null}
       </View>
     </View>

@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
+  Easing,
+  Linking,
   Pressable,
   StyleSheet,
   Text,
@@ -23,6 +26,7 @@ import {
   releaseRecordingAudioMode,
 } from '../lib/recording';
 import { processRecording } from '../lib/session-pipeline';
+import { tapMedium, notifySuccess, notifyWarning } from '../lib/haptics';
 import { formatElapsed, dbToMeter } from '../lib/format';
 import { theme } from '../lib/theme';
 import { NightBackground } from '../components/NightBackground';
@@ -41,6 +45,21 @@ export default function RecordScreen() {
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
   const [procElapsed, setProcElapsed] = useState(0);
   const startedAt = useRef<number>(0);
+  const transitioning = useRef(false);
+  const recPulse = useRef(new Animated.Value(1)).current;
+
+  // 録音中バッジの赤ドットをゆっくり明滅（生きている感）。
+  useEffect(() => {
+    if (phase !== 'recording') return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(recPulse, { toValue: 0.25, duration: 900, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(recPulse, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [phase, recPulse]);
 
   // 処理中の経過秒（永久スピナーに見せない・動いていることを伝える）。
   useEffect(() => {
@@ -63,21 +82,32 @@ export default function RecordScreen() {
   }, [router]);
 
   const onSleep = async () => {
+    // 連打ガード: prepareToRecordAsync が終わる前の再タップで二重開始しない。
+    if (transitioning.current) return;
+    transitioning.current = true;
     try {
       const ok = await ensureMicPermission();
       if (!ok) {
-        Alert.alert('マイクの許可が必要です', '設定アプリからマイクの使用を許可してね。');
+        notifyWarning();
+        Alert.alert('マイクの許可が必要です', '設定アプリからマイクの使用を許可してね。', [
+          { text: 'あとで', style: 'cancel' },
+          { text: '設定を開く', onPress: () => Linking.openSettings() },
+        ]);
         return;
       }
       await configureSleepAudioMode();
       await recorder.prepareToRecordAsync();
       recorder.record();
       startedAt.current = Date.now();
+      tapMedium();
       setPhase('recording');
     } catch (e) {
       console.warn('[ibiki] start failed', e);
+      notifyWarning();
       Alert.alert('録音を開始できませんでした', 'もう一度試してね。');
       setPhase('idle');
+    } finally {
+      transitioning.current = false;
     }
   };
 
@@ -111,6 +141,10 @@ export default function RecordScreen() {
   };
 
   const onWake = async () => {
+    // 連打ガード: phase 遷移の再レンダー前の二度押しで processRecording を二重実行しない。
+    if (transitioning.current) return;
+    transitioning.current = true;
+    tapMedium();
     setPhase('processing');
     try {
       await recorder.stop();
@@ -127,6 +161,7 @@ export default function RecordScreen() {
         endedAt: Date.now(),
       });
       setPhase('idle');
+      notifySuccess();
       // 解析が時間切れでも保存は済んでいるので必ずレポートへ。空の可能性だけ伝える。
       if (result.analysisTimedOut) {
         Alert.alert(
@@ -137,8 +172,11 @@ export default function RecordScreen() {
       router.push({ pathname: '/report/[sessionId]', params: { sessionId: result.session.id } });
     } catch (e) {
       console.warn('[ibiki] stop/process failed', e);
+      notifyWarning();
       Alert.alert('レポートを作成できませんでした', 'もう一度試してね。');
       setPhase('idle');
+    } finally {
+      transitioning.current = false;
     }
   };
 
@@ -179,7 +217,7 @@ export default function RecordScreen() {
         {phase === 'recording' && (
           <View style={styles.center}>
             <View style={styles.recBadge}>
-              <View style={styles.recDot} />
+              <Animated.View style={[styles.recDot, { opacity: recPulse }]} />
               <Text style={styles.recLabel}>録音中</Text>
             </View>
             <Text style={styles.timer}>{formatElapsed(elapsedSec)}</Text>
@@ -194,14 +232,25 @@ export default function RecordScreen() {
                 />
               </View>
             </GlassCard>
-            <Pressable onPress={onWake} style={({ pressed }) => pressed && styles.pressed}>
+            <Pressable
+              onPress={onWake}
+              accessibilityRole="button"
+              accessibilityLabel="おはよう。録音をとめてレポートを見る"
+              style={({ pressed }) => pressed && styles.pressed}
+            >
               <LinearGradient colors={['#8A97F2', '#6573DC', '#5560C8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.wakeBtn}>
                 <Text style={styles.wakeBtnText}>おはよう</Text>
                 <Text style={styles.wakeBtnSub}>録音をとめてレポートを見る</Text>
               </LinearGradient>
             </Pressable>
             {/* 間違って録音を始めたとき用の取り消し（破棄）。 */}
-            <Pressable onPress={onCancel} hitSlop={10} style={({ pressed }) => [styles.cancelBtn, pressed && styles.pressed]}>
+            <Pressable
+              onPress={onCancel}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="録音をやめる。保存しない"
+              style={({ pressed }) => [styles.cancelBtn, pressed && styles.pressed]}
+            >
               <Text style={styles.cancelText}>録音をやめる（保存しない）</Text>
             </Pressable>
           </View>
